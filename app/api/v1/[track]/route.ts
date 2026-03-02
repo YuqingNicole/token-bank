@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+type RouteContext = {
+  params: Promise<{ track: string }>
+}
+
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ track: string }> }
+  context: RouteContext
 ) {
-  const { track } = await params;
+  const { track } = await context.params;
   const subKey = req.headers.get('x-api-key');
   
   const MASTER_KEY = process.env.CLAUDE_MASTER_KEY;
