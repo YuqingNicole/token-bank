@@ -5,22 +5,33 @@ import { Settings, Pencil, Trash2, Check, X, Plus, ChevronDown, ChevronUp } from
 import { VENDOR_CONFIG } from '@/lib/vendors';
 import type { SubKeyData, VendorId } from '@/lib/types';
 import { useLang, LangToggle } from '@/components/LangContext';
+import { GroupManager } from '@/components/GroupManager';
 
 interface KeyRow extends SubKeyData { key: string; }
+interface GroupOption { hashKey: string; label: string; }
 
 interface EditState {
   name: string;
+  group: string;
   totalQuota: string;
   expiresAt: string;
 }
 
-function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () => void; onDeleted: () => void; }) {
+function KeySettingsRow({
+  row, groups, onSaved, onDeleted,
+}: {
+  row: KeyRow;
+  groups: GroupOption[];
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
   const { t } = useLang();
   const s = t.settings;
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EditState>({
     name: row.name,
+    group: row.group,
     totalQuota: row.totalQuota != null ? String(row.totalQuota) : '',
     expiresAt: row.expiresAt ? row.expiresAt.slice(0, 10) : '',
   });
@@ -32,6 +43,7 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: form.name,
+        group: form.group,
         totalQuota: form.totalQuota ? parseInt(form.totalQuota, 10) : null,
         expiresAt: form.expiresAt || null,
       }),
@@ -55,7 +67,6 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
 
   return (
     <div className="border border-black/10 rounded-xl bg-white overflow-hidden">
-      {/* Row header */}
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-[10px] border border-black/15 rounded-full px-2 py-px uppercase tracking-wider text-black/50 flex-shrink-0">
@@ -74,7 +85,6 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
         </div>
       </div>
 
-      {/* Stats bar */}
       <div className="flex items-center gap-4 px-4 pb-3 text-[11px] text-black/40 font-mono border-t border-black/5 pt-2">
         <span>{row.usage} {s.used}</span>
         <span>·</span>
@@ -91,7 +101,6 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
         </span>
       </div>
 
-      {/* Edit panel */}
       {editing && (
         <div className="border-t border-black/5 px-4 py-4 bg-black/[0.01] space-y-3">
           <div>
@@ -103,6 +112,31 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
               className="w-full border border-black/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black/30"
             />
           </div>
+
+          <div>
+            <label className="text-[10px] font-semibold text-black/40 uppercase tracking-widest block mb-1">{s.group}</label>
+            {groups.length > 0 ? (
+              <select
+                value={form.group}
+                onChange={e => setForm(f => ({ ...f, group: e.target.value }))}
+                className="w-full border border-black/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black/30 bg-white"
+              >
+                {groups.map(g => (
+                  <option key={g.hashKey} value={g.hashKey.split(':')[1] || g.hashKey}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={form.group}
+                onChange={e => setForm(f => ({ ...f, group: e.target.value }))}
+                className="w-full border border-black/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black/30"
+              />
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-black/40 uppercase tracking-widest block mb-1">
@@ -129,6 +163,7 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
               />
             </div>
           </div>
+
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleSave}
@@ -153,14 +188,18 @@ function KeySettingsRow({ row, onSaved, onDeleted }: { row: KeyRow; onSaved: () 
 export default function SettingsPage() {
   const { t } = useLang();
   const s = t.settings;
-  const [keys, setKeys] = useState<KeyRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'keys' | 'groups'>('keys');
   const [vendorFilter, setVendorFilter] = useState<string>('all');
+  const [keys, setKeys] = useState<KeyRow[]>([]);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const loadKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const url = vendorFilter === 'all' ? '/api/v1/manage/keys' : `/api/v1/manage/keys?vendor=${vendorFilter}`;
+      const url = vendorFilter === 'all'
+        ? '/api/v1/manage/keys'
+        : `/api/v1/manage/keys?vendor=${vendorFilter}`;
       const res = await fetch(url);
       const data = await res.json();
       const rows: KeyRow[] = Object.entries(data).map(([key, val]) => ({ key, ...(val as SubKeyData) }));
@@ -171,9 +210,34 @@ export default function SettingsPage() {
     }
   }, [vendorFilter]);
 
-  useEffect(() => { loadKeys(); }, [loadKeys]);
+  const loadGroups = useCallback(async () => {
+    if (vendorFilter === 'all') { setGroups([]); return; }
+    try {
+      const res = await fetch(`/api/v1/manage/groups?vendor=${vendorFilter}`);
+      const data = await res.json();
+      const opts: GroupOption[] = Object.entries(data).map(([hashKey, val]) => ({
+        hashKey,
+        label: (val as { label: string }).label,
+      }));
+      setGroups(opts);
+    } catch {
+      setGroups([]);
+    }
+  }, [vendorFilter]);
+
+  useEffect(() => { loadKeys(); loadGroups(); }, [loadKeys, loadGroups]);
+
+  // When vendor changes, reset to keys view
+  const handleVendorChange = (v: string) => {
+    setVendorFilter(v);
+    if (v === 'all') setView('keys');
+  };
 
   const vendors = ['all', ...Object.keys(VENDOR_CONFIG)] as const;
+
+  // Pass groups for a key's vendor to each row
+  const groupsForRow = (row: KeyRow) =>
+    groups.filter(g => g.hashKey.startsWith(row.vendor + ':'));
 
   return (
     <div className="min-h-screen bg-[#f7f7f7] text-[#111] font-sans selection:bg-black/10">
@@ -199,13 +263,15 @@ export default function SettingsPage() {
         </header>
 
         {/* Vendor filter */}
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-2 mb-4 flex-wrap">
           {vendors.map(v => (
             <button
               key={v}
-              onClick={() => setVendorFilter(v)}
+              onClick={() => handleVendorChange(v)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                vendorFilter === v ? 'bg-black text-white border-black' : 'border-black/10 text-black/50 hover:text-black hover:border-black/20 bg-white'
+                vendorFilter === v
+                  ? 'bg-black text-white border-black'
+                  : 'border-black/10 text-black/50 hover:text-black hover:border-black/20 bg-white'
               }`}
             >
               {v === 'all' ? s.allVendors : VENDOR_CONFIG[v as VendorId].label}
@@ -213,22 +279,66 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* Key list */}
-        {loading ? (
-          <div className="text-center py-12 text-sm text-black/30">{t.common.loading}</div>
-        ) : keys.length === 0 ? (
-          <div className="text-center py-12 border border-black/10 rounded-2xl bg-white">
-            <p className="text-sm text-black/30 mb-4">{s.noKeys}</p>
-            <a href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold border border-black px-4 py-2 rounded-lg hover:bg-black hover:text-white transition-colors">
-              <Plus size={12} /> {s.createKey}
-            </a>
+        {/* Keys / Groups tab toggle */}
+        <div className="flex gap-1 mb-6 border-b border-black/8">
+          <button
+            onClick={() => setView('keys')}
+            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              view === 'keys'
+                ? 'border-black text-black'
+                : 'border-transparent text-black/40 hover:text-black'
+            }`}
+          >
+            {s.viewKeys}
+          </button>
+          <button
+            onClick={() => setView('groups')}
+            disabled={vendorFilter === 'all'}
+            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px disabled:opacity-30 disabled:cursor-not-allowed ${
+              view === 'groups'
+                ? 'border-black text-black'
+                : 'border-transparent text-black/40 hover:text-black'
+            }`}
+          >
+            {s.viewGroups}
+          </button>
+        </div>
+
+        {/* Groups view */}
+        {view === 'groups' && vendorFilter !== 'all' && (
+          <div className="bg-white border border-black/10 rounded-2xl p-6">
+            <GroupManager
+              vendor={vendorFilter as VendorId}
+              groups={groups}
+              onGroupsChanged={loadGroups}
+            />
           </div>
-        ) : (
-          <div className="space-y-3">
-            {keys.map(row => (
-              <KeySettingsRow key={row.key} row={row} onSaved={loadKeys} onDeleted={loadKeys} />
-            ))}
-          </div>
+        )}
+
+        {/* Keys view */}
+        {view === 'keys' && (
+          loading ? (
+            <div className="text-center py-12 text-sm text-black/30">{t.common.loading}</div>
+          ) : keys.length === 0 ? (
+            <div className="text-center py-12 border border-black/10 rounded-2xl bg-white">
+              <p className="text-sm text-black/30 mb-4">{s.noKeys}</p>
+              <a href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold border border-black px-4 py-2 rounded-lg hover:bg-black hover:text-white transition-colors">
+                <Plus size={12} /> {s.createKey}
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {keys.map(row => (
+                <KeySettingsRow
+                  key={row.key}
+                  row={row}
+                  groups={groupsForRow(row)}
+                  onSaved={() => { loadKeys(); loadGroups(); }}
+                  onDeleted={loadKeys}
+                />
+              ))}
+            </div>
+          )
         )}
 
         <div className="mt-8 pt-4 border-t border-black/5 text-xs text-black/30 text-center">

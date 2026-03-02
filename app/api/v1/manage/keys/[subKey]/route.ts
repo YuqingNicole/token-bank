@@ -32,6 +32,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     const updated: SubKeyData = {
       ...keyData,
       name: typeof payload.name === 'string' ? payload.name.trim() : keyData.name,
+      group: typeof payload.group === 'string' && payload.group.trim() ? payload.group.trim() : keyData.group,
       totalQuota: payload.totalQuota === null ? null : typeof payload.totalQuota === 'number' ? Math.floor(payload.totalQuota) : keyData.totalQuota,
       expiresAt: payload.expiresAt === null ? null : typeof payload.expiresAt === 'string' && payload.expiresAt ? payload.expiresAt : keyData.expiresAt,
     };
