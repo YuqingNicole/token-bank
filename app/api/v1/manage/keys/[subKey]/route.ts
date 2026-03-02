@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { redis } from '@/lib/redis';
+import { VENDOR_CONFIG } from '@/lib/vendors';
+import type { SubKeyData, SubKeyRecord } from '@/lib/types';
+
+type RouteContext = {
+  params: Promise<{ subKey: string }>;
+};
+
+const parseKeyRecord = (value: string | Record<string, unknown> | null): SubKeyData | null => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as SubKeyData;
+    } catch {
+      return null;
+    }
+  }
+  return value as unknown as SubKeyData;
+};
+
+export async function GET(req: NextRequest, context: RouteContext) {
+  const { subKey } = await context.params;
+
+  if (!subKey) {
+    return NextResponse.json({ error: 'subKey is required' }, { status: 400 });
+  }
+
+  try {
+    const rawValue = await redis.hget('vault:subkeys', subKey);
+    const keyData = parseKeyRecord(rawValue as string | Record<string, unknown> | null);
+
+    if (!keyData) {
+      return NextResponse.json({ error: 'Key not found' }, { status: 404 });
+    }
+
+    const config = VENDOR_CONFIG[keyData.vendor];
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || '') + config.basePath;
+
+    const record: SubKeyRecord = {
+      key: subKey,
+      baseUrl,
+      ...keyData,
+    };
+
+    return NextResponse.json(record);
+  } catch (error) {
+    console.error('Failed to fetch sub-key', error);
+    return NextResponse.json({ error: 'Vault datastore unavailable' }, { status: 500 });
+  }
+}
