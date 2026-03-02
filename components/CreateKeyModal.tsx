@@ -49,19 +49,25 @@ export function CreateKeyModal({ onClose, onCreated }: CreateKeyModalProps) {
 
   const handleCreateGroup = async () => {
     if (!newGroupId.trim() || !newGroupLabel.trim()) return;
+    setError('');
     try {
-      await fetch('/api/v1/manage/groups', {
+      const res = await fetch('/api/v1/manage/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vendor, groupId: newGroupId.trim(), label: newGroupLabel.trim() }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to create group');
+        return;
+      }
       await loadGroups(vendor);
       setGroup(newGroupId.trim());
       setNewGroupId('');
       setNewGroupLabel('');
       setCreatingGroup(false);
     } catch {
-      setError('Failed to create group');
+      setError('Network error — failed to create group');
     }
   };
 
