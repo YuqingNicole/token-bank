@@ -19,6 +19,31 @@ const parseKeyRecord = (value: string | Record<string, unknown> | null): SubKeyD
   return value as unknown as SubKeyData;
 };
 
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  const { subKey } = await context.params;
+  if (!subKey) return NextResponse.json({ error: 'subKey is required' }, { status: 400 });
+
+  try {
+    const payload = await req.json();
+    const rawValue = await redis.hget('vault:subkeys', subKey);
+    const keyData = parseKeyRecord(rawValue as string | Record<string, unknown> | null);
+    if (!keyData) return NextResponse.json({ error: 'Key not found' }, { status: 404 });
+
+    const updated: SubKeyData = {
+      ...keyData,
+      name: typeof payload.name === 'string' ? payload.name.trim() : keyData.name,
+      totalQuota: payload.totalQuota === null ? null : typeof payload.totalQuota === 'number' ? Math.floor(payload.totalQuota) : keyData.totalQuota,
+      expiresAt: payload.expiresAt === null ? null : typeof payload.expiresAt === 'string' && payload.expiresAt ? payload.expiresAt : keyData.expiresAt,
+    };
+
+    await redis.hset('vault:subkeys', { [subKey]: JSON.stringify(updated) });
+    return NextResponse.json({ key: subKey, ...updated });
+  } catch (error) {
+    console.error('Failed to update sub-key', error);
+    return NextResponse.json({ error: 'Unable to update key' }, { status: 500 });
+  }
+}
+
 export async function GET(req: NextRequest, context: RouteContext) {
   const { subKey } = await context.params;
 

@@ -73,9 +73,10 @@ export default function VaultDashboard() {
         {/* Footer */}
         <div className="mt-8 pt-4 border-t border-black/5 flex items-center justify-between text-xs text-black/30">
           <span>Bridge Vault · Multi-vendor proxy</span>
-          <a href="/query" className="hover:text-black transition-colors">
-            Key Lookup →
-          </a>
+          <div className="flex items-center gap-4">
+            <a href="/settings" className="hover:text-black transition-colors">Settings</a>
+            <a href="/query" className="hover:text-black transition-colors">Key Lookup →</a>
+          </div>
         </div>
       </div>
 
