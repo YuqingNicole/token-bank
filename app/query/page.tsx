@@ -12,6 +12,7 @@ import {
   Share2,
   BarChart2,
   CalendarClock,
+  KeyRound,
 } from 'lucide-react';
 import type { SubKeyRecord } from '@/lib/types';
 import { VENDOR_CONFIG } from '@/lib/vendors';
@@ -51,12 +52,22 @@ export default function UsageQuery() {
   return (
     <div className="min-h-screen bg-[#f7f7f7] text-[#111] font-sans selection:bg-black/10">
       <div className="max-w-3xl mx-auto px-6 py-12">
-        <header className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-black/10 bg-white shadow-sm shadow-black/5 mb-5">
-            <ShieldCheck className="w-6 h-6 text-black" />
+        <header className="flex items-center justify-between mb-10 border-b border-black/10 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full border border-black/10 flex items-center justify-center">
+              <KeyRound className="w-6 h-6 text-black" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+                KEY INQUIRY
+                <span className="text-[11px] px-2 py-0.5 border border-black/20 rounded-full uppercase">lookup</span>
+              </h1>
+              <p className="text-sm text-black/60">Verify status and review vault usage</p>
+            </div>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight mb-2">Key Inquiry</h1>
-          <p className="text-sm text-black/60">Verify status and review vault usage</p>
+          <a href="/" className="text-xs text-black/40 hover:text-black transition-colors">
+            ← Dashboard
+          </a>
         </header>
 
         {/* Search Box */}
@@ -198,10 +209,8 @@ export default function UsageQuery() {
           </div>
         )}
 
-        <div className="mt-8 text-center">
-          <a href="/" className="text-xs text-black/60 hover:text-black transition-colors">
-            ← Back to Dashboard
-          </a>
+        <div className="mt-8 pt-4 border-t border-black/5 text-xs text-black/30 text-center">
+          Bridge Vault · Key Lookup
         </div>
       </div>
     </div>
