@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Pencil, Check, X } from 'lucide-react';
 import { VENDOR_CONFIG } from '@/lib/vendors';
 import type { VendorId, SubKeyData } from '@/lib/types';
 import { KeyTable } from './KeyTable';
@@ -29,6 +30,38 @@ export function VendorCard({ vendor }: VendorCardProps) {
   const [activeGroup, setActiveGroup] = useState<string>('');
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(false);
+  const [budgetUsd, setBudgetUsd] = useState<number>(20);
+  const [editingBudget, setEditingBudget] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('');
+  const budgetInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (vendor !== 'youragent') return;
+    fetch('/api/v1/manage/settings')
+      .then(r => r.json())
+      .then((d: { youagentBudgetUsd?: number }) => {
+        if (typeof d.youagentBudgetUsd === 'number') setBudgetUsd(d.youagentBudgetUsd);
+      })
+      .catch(() => {});
+  }, [vendor]);
+
+  const startEditBudget = () => {
+    setBudgetInput(String(budgetUsd));
+    setEditingBudget(true);
+    setTimeout(() => budgetInputRef.current?.select(), 0);
+  };
+
+  const saveBudget = async () => {
+    const val = parseFloat(budgetInput);
+    if (!Number.isFinite(val) || val < 0) { setEditingBudget(false); return; }
+    const res = await fetch('/api/v1/manage/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ youagentBudgetUsd: val }),
+    });
+    if (res.ok) setBudgetUsd(val);
+    setEditingBudget(false);
+  };
 
   const summary = keys.reduce(
     (acc, k) => {
@@ -47,8 +80,7 @@ export function VendorCard({ vendor }: VendorCardProps) {
     outputTokens: summary.outputTokens,
   });
 
-  const YOURAGENT_BUDGET_USD = 20;
-  const budgetRemainingUsd = Math.max(0, YOURAGENT_BUDGET_USD - summary.costUsd);
+  const budgetRemainingUsd = Math.max(0, budgetUsd - summary.costUsd);
   const diffUsd = claudeOfficialCostUsd - summary.costUsd;
   const formatUsd = (n: number) => {
     if (!Number.isFinite(n)) return '—';
@@ -170,7 +202,27 @@ export function VendorCard({ vendor }: VendorCardProps) {
             {vendor === 'youragent' && (
               <div className="border border-black/10 rounded-xl p-3 bg-white">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-black/50 font-mono">
-                  <span className="font-semibold text-black/60">{t.vendorCard.budgetLabel} ${YOURAGENT_BUDGET_USD.toFixed(0)}</span>
+                  <span className="font-semibold text-black/60 flex items-center gap-1">
+                    {t.vendorCard.budgetLabel}{' '}
+                    {editingBudget ? (
+                      <>
+                        $<input
+                          ref={budgetInputRef}
+                          value={budgetInput}
+                          onChange={e => setBudgetInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveBudget(); if (e.key === 'Escape') setEditingBudget(false); }}
+                          className="w-16 border border-black/20 rounded px-1 text-black font-mono text-[11px] outline-none focus:border-black/40"
+                        />
+                        <button onClick={saveBudget} className="text-black/50 hover:text-green-600"><Check size={11} /></button>
+                        <button onClick={() => setEditingBudget(false)} className="text-black/50 hover:text-red-500"><X size={11} /></button>
+                      </>
+                    ) : (
+                      <>
+                        ${budgetUsd % 1 === 0 ? budgetUsd.toFixed(0) : budgetUsd.toFixed(2)}
+                        <button onClick={startEditBudget} className="text-black/30 hover:text-black/60"><Pencil size={10} /></button>
+                      </>
+                    )}
+                  </span>
                   <span>{t.vendorCard.budgetUsed}: {formatUsd(summary.costUsd)}</span>
                   <span>{t.vendorCard.budgetRemaining}: {formatUsd(budgetRemainingUsd)}</span>
                   <span>{t.vendorCard.claudeOfficial}: {formatUsd(claudeOfficialCostUsd)}</span>

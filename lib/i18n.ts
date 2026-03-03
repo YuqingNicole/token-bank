@@ -25,6 +25,7 @@ export const translations = {
       docs: 'Docs',
       settings: 'Settings',
       keyLookup: 'Key Lookup →',
+      analytics: 'Analytics',
     },
     vendorCard: {
       noGroups: 'No groups yet. Create a key to get started.',
@@ -111,6 +112,8 @@ export const translations = {
       callsUnit: 'calls',
       unnamed: 'Unnamed Key',
       footerLabel: 'Bridge Vault · Key Lookup',
+      tokens: 'Tokens',
+      estCost: 'Est. Cost',
     },
     settings: {
       title: 'SETTINGS',
@@ -203,6 +206,7 @@ export const translations = {
       docs: '文档',
       settings: '设置',
       keyLookup: '密钥查询 →',
+      analytics: '数据看板',
     },
     vendorCard: {
       noGroups: '暂无分组，创建密钥以开始使用。',
@@ -289,6 +293,8 @@ export const translations = {
       callsUnit: '次调用',
       unnamed: '未命名密钥',
       footerLabel: 'Bridge Vault · 密钥查询',
+      tokens: 'Tokens',
+      estCost: '预估费用',
     },
     settings: {
       title: '设置',
@@ -332,6 +338,11 @@ export const translations = {
       examplesOpenAI: 'OpenAI 兼容示例：',
       keyManagement: '密钥管理 API',
       quotaExpiry: '配额与过期',
+      quotaPoints: [
+        ['totalQuota', 'null', '429 Quota exceeded'],
+        ['expiresAt', 'null', '403 Key expired'],
+        ['usage', '', ''],
+      ] as const,
       quotaBullets: [
         'totalQuota 为 null 表示无限制；超出后返回 429 Quota exceeded',
         'expiresAt 为 null 表示永不过期；过期后返回 403 Key expired',

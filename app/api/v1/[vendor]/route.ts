@@ -64,6 +64,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const model = safeModelFromBody(rawBody);
     const upstream = buildUpstreamRequest(vendor, masterKey, rawBody);
 
+    console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} model=${model ?? '?'} → ${upstream.url}`);
+
     const response = await fetch(upstream.url, {
       method: 'POST',
       headers: upstream.headers,
@@ -80,6 +82,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
       const outputInc = tokenUsage?.outputTokens ?? 0;
       const costInc = tokenUsage ? estimateVendorCostUsd(vendor, model, tokenUsage) : 0;
 
+      console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} ✓ in=${inputInc} out=${outputInc} cost=$${costInc.toFixed(6)}`);
+
       const updated = {
         ...keyData,
         usage: ((keyData as { usage?: number }).usage || 0) + 1,
@@ -89,11 +93,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
         costUsd: ((keyData as { costUsd?: number }).costUsd || 0) + costInc,
       };
       await redis.hset('vault:subkeys', { [subKey]: JSON.stringify(updated) });
+
+      // fire-and-forget daily call counter for analytics
+      const today = now.slice(0, 10);
+      void redis.incr(`vault:daily:calls:${today}`)
+        .then(() => redis.expire(`vault:daily:calls:${today}`, 35 * 24 * 3600))
+        .catch((err) => console.warn('[analytics] daily counter failed', err));
+    } else {
+      console.warn(`[proxy] ${vendor} key=${subKey.slice(-8)} ✗ HTTP ${response.status} model=${model ?? '?'} error=${JSON.stringify((data as Record<string, unknown>).error ?? data).slice(0, 200)}`);
     }
 
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy request failed', error);
+    console.error(`[proxy] ${vendor} key=${subKey.slice(-8)} fatal`, error);
     return NextResponse.json({ error: 'Proxy Error' }, { status: 500 });
   }
 }

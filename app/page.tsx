@@ -91,6 +91,9 @@ export default function VaultDashboard() {
         <div className="mt-8 pt-4 border-t border-black/5 flex items-center justify-between text-xs text-black/30">
           <span>{t.dashboard.footerLabel}</span>
           <div className="flex items-center gap-2">
+            <a href="/analytics" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
+              {t.dashboard.analytics}
+            </a>
             <a href="/docs" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
               {t.dashboard.docs}
             </a>

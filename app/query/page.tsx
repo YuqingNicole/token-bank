@@ -232,6 +232,36 @@ export default function UsageQuery() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                <div className="border border-black/10 rounded-xl p-3 bg-black/[0.02] sm:col-span-2">
+                  <div className="flex items-center gap-1.5 text-black/50 mb-1.5">
+                    <BarChart2 size={11} />
+                    <span className="text-[10px] uppercase tracking-[0.2em]">{q.tokens}</span>
+                  </div>
+                  <div className="text-sm font-semibold font-mono">
+                    {(result.inputTokens || result.outputTokens)
+                      ? ((result.inputTokens || 0) + (result.outputTokens || 0)).toLocaleString()
+                      : '—'}
+                  </div>
+                  {(result.inputTokens || result.outputTokens) && (
+                    <div className="text-[10px] text-black/30 font-mono mt-0.5">
+                      in {(result.inputTokens || 0).toLocaleString()} · out {(result.outputTokens || 0).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                <div className="border border-black/10 rounded-xl p-3 bg-black/[0.02] sm:col-span-2">
+                  <div className="flex items-center gap-1.5 text-black/50 mb-1.5">
+                    <Zap size={11} />
+                    <span className="text-[10px] uppercase tracking-[0.2em]">{q.estCost}</span>
+                  </div>
+                  <div className="text-sm font-semibold font-mono">
+                    {result.costUsd != null
+                      ? (result.costUsd === 0 ? '$0.00' : result.costUsd < 0.01 ? '<$0.01' : `$${result.costUsd.toFixed(4)}`)
+                      : '—'}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div className="border border-black/10 rounded-xl p-3 bg-black/[0.02]">
                   <div className="flex items-center gap-1.5 text-black/50 mb-1.5">

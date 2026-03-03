@@ -36,5 +36,6 @@ export const config = {
     '/',
     '/query',
     '/settings',
+    '/analytics',
   ],
 };
