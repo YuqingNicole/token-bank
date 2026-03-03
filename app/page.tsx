@@ -6,7 +6,6 @@ import { VENDOR_CONFIG } from '@/lib/vendors';
 import type { VendorId } from '@/lib/types';
 import { VendorCard } from '@/components/VendorCard';
 import { CreateKeyModal } from '@/components/CreateKeyModal';
-import { DocsModal } from '@/components/DocsModal';
 import { useLang, LangToggle } from '@/components/LangContext';
 
 const VENDORS: VendorId[] = ['youragent', 'claude', 'openai', 'gemini'];
@@ -15,7 +14,6 @@ export default function VaultDashboard() {
   const { t } = useLang();
   const [activeVendor, setActiveVendor] = useState<VendorId>('youragent');
   const [showCreate, setShowCreate] = useState(false);
-  const [showDocs, setShowDocs] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
 
   const handleLogout = async () => {
@@ -93,12 +91,9 @@ export default function VaultDashboard() {
         <div className="mt-8 pt-4 border-t border-black/5 flex items-center justify-between text-xs text-black/30">
           <span>{t.dashboard.footerLabel}</span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowDocs(true)}
-              className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors"
-            >
+            <a href="/docs" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
               {t.dashboard.docs}
-            </button>
+            </a>
             <a href="/settings" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
               {t.dashboard.settings}
             </a>
@@ -112,8 +107,6 @@ export default function VaultDashboard() {
       {showCreate && (
         <CreateKeyModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
-
-      {showDocs && <DocsModal onClose={() => setShowDocs(false)} />}
     </div>
   );
 }
