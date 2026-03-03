@@ -8,7 +8,7 @@ import { useLang, LangToggle } from '@/components/LangContext';
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const from = params.get('from') || '/';
+  const from = params.get('from') || '/vault';
   const { t } = useLang();
   const l = t.login;
 
