@@ -75,7 +75,9 @@ function KeySettingsRow({
           <span className="text-[10px] border border-black/15 rounded-full px-2 py-px uppercase tracking-wider text-black/50 flex-shrink-0">
             {VENDOR_CONFIG[row.vendor].label}
           </span>
-          <span className="text-[10px] text-black/30 border border-black/10 rounded-full px-2 py-px flex-shrink-0">{row.group}</span>
+          <span className="text-[10px] text-black/30 border border-black/10 rounded-full px-2 py-px flex-shrink-0">
+            {groups.find(g => (g.hashKey.split(':')[1] || g.hashKey) === row.group)?.label ?? row.group}
+          </span>
           <span className="text-sm font-medium truncate">{row.name}</span>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
@@ -214,9 +216,11 @@ export default function SettingsPage() {
   }, [vendorFilter]);
 
   const loadGroups = useCallback(async () => {
-    if (vendorFilter === 'all') { setGroups([]); return; }
     try {
-      const res = await fetch(`/api/v1/manage/groups?vendor=${vendorFilter}`);
+      const url = vendorFilter === 'all'
+        ? '/api/v1/manage/groups'
+        : `/api/v1/manage/groups?vendor=${vendorFilter}`;
+      const res = await fetch(url);
       const data = await res.json();
       const opts: GroupOption[] = Object.entries(data).map(([hashKey, val]) => ({
         hashKey,
