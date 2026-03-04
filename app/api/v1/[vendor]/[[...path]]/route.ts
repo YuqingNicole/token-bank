@@ -5,7 +5,7 @@ import { buildUpstreamRequest } from '@/lib/proxy';
 import { extractTokenUsage, estimateVendorCostUsd, safeModelFromBody } from '@/lib/billing';
 
 type RouteContext = {
-  params: Promise<{ vendor: string }>;
+  params: Promise<{ vendor: string; path?: string[] }>;
 };
 
 const parseKeyRecord = (value: unknown) => {
