@@ -351,7 +351,7 @@ export default function AnalyticsPage() {
                             <>
                               <div className="flex justify-between text-[10px] text-black/40 mb-1">
                                 <span>{a.quota}</span>
-                                <span className="font-mono">{k.usage} / {k.totalQuota}</span>
+                                <span className="font-mono">{fmtNum((k.inputTokens||0)+(k.outputTokens||0))} / {fmtNum(k.totalQuota!)} tok</span>
                               </div>
                               <QuotaBar pct={k.quotaPct} danger={nearQ} />
                             </>

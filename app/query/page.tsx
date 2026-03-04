@@ -208,7 +208,7 @@ export default function UsageQuery() {
                     <Zap size={11} />
                     <span className="text-[10px] uppercase tracking-[0.2em]">{q.used}</span>
                   </div>
-                  <div className="text-sm font-semibold">{result.usage.toLocaleString()}</div>
+                  <div className="text-sm font-semibold">{((result.inputTokens || 0) + (result.outputTokens || 0)).toLocaleString()}</div>
                 </div>
                 <div className="border border-black/10 rounded-xl p-3 bg-black/[0.02]">
                   <div className="flex items-center gap-1.5 text-black/50 mb-1.5">
@@ -217,7 +217,7 @@ export default function UsageQuery() {
                   </div>
                   <div className="text-sm font-semibold">
                     {result.totalQuota != null
-                      ? Math.max(0, result.totalQuota - result.usage).toLocaleString()
+                      ? Math.max(0, result.totalQuota - (result.inputTokens || 0) - (result.outputTokens || 0)).toLocaleString()
                       : '∞'}
                   </div>
                 </div>
