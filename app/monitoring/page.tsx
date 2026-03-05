@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, Activity, Key, Zap, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Activity, Key, Zap, AlertTriangle, CheckCircle, XCircle, CloudDownload } from 'lucide-react';
 import Link from 'next/link';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +33,14 @@ interface VaultEvent {
   model?: string;
   inputTokens?: number;
   outputTokens?: number;
+}
+
+interface YASync {
+  keyInfo: { name: string; totalCostLimit: number; totalCost: number; tokenLimit: number };
+  total: { requests: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheCreateTokens: number; allTokens: number };
+  daily: { requests: number; allTokens: number };
+  recentRecords: { timestamp: string; model: string; inputTokens: number; outputTokens: number; cost: number; totalTokens: number }[];
+  syncedAt: string;
 }
 
 interface MonitorData {
@@ -92,18 +100,37 @@ const EVENT_META: Record<string, { label: string; color: string }> = {
 
 export default function MonitoringPage() {
   const [data, setData] = useState<MonitorData | null>(null);
+  const [yaSync, setYaSync] = useState<YASync | null>(null);
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState('botearn');
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async (g: string) => {
     setRefreshing(true);
     try {
-      const res = await fetch(`/api/v1/manage/monitor?group=${encodeURIComponent(g)}`);
-      if (res.ok) setData(await res.json());
+      const [monRes, yaRes] = await Promise.all([
+        fetch(`/api/v1/manage/monitor?group=${encodeURIComponent(g)}`),
+        fetch('/api/v1/manage/sync/youragent'),
+      ]);
+      if (monRes.ok) setData(await monRes.json());
+      if (yaRes.ok) setYaSync(await yaRes.json());
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  }, []);
+
+  const triggerSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/api/v1/manage/sync/youragent', { method: 'POST' });
+      if (res.ok) {
+        const yaRes = await fetch('/api/v1/manage/sync/youragent');
+        if (yaRes.ok) setYaSync(await yaRes.json());
+      }
+    } finally {
+      setSyncing(false);
     }
   }, []);
 
@@ -141,6 +168,13 @@ export default function MonitoringPage() {
             placeholder="group filter"
           />
           <button
+            onClick={triggerSync}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-black/10 bg-white hover:bg-black/5 transition-colors"
+          >
+            <CloudDownload size={14} className={syncing ? 'animate-pulse' : ''} />
+            同步 YA
+          </button>
+          <button
             onClick={() => load(group)}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-black/10 bg-white hover:bg-black/5 transition-colors"
           >
@@ -164,6 +198,90 @@ export default function MonitoringPage() {
               <StatCard icon={<Activity size={16} />} label="已用 Tokens" value={fmtNum(data.summary.totalTokens)} sub={data.summary.totalQuota > 0 ? `配额 ${fmtNum(data.summary.totalQuota)}` : '无配额'} />
               <StatCard icon={<AlertTriangle size={16} />} label="配额利用率" value={data.summary.quotaUtilizationPct != null ? `${(data.summary.quotaUtilizationPct * 100).toFixed(1)}%` : '—'} sub={fmtUsd(data.summary.totalCostUsd)} />
             </div>
+
+            {/* YourAgent Real Data */}
+            {yaSync && (
+              <section className="bg-white rounded-2xl border border-black/10 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-medium text-sm">your-agent.cc 真实数据</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">同步于 {fmtTime(yaSync.syncedAt)}</p>
+                  </div>
+                  <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">实时</span>
+                </div>
+                <div className="p-5 space-y-4">
+                  {/* Cost bar */}
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-500">总费用预算</span>
+                      <span className="font-semibold tabular-nums">
+                        {fmtUsd(yaSync.keyInfo.totalCost)} / {fmtUsd(yaSync.keyInfo.totalCostLimit)}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          yaSync.keyInfo.totalCost / yaSync.keyInfo.totalCostLimit >= 0.9 ? 'bg-red-400' :
+                          yaSync.keyInfo.totalCost / yaSync.keyInfo.totalCostLimit >= 0.7 ? 'bg-orange-400' : 'bg-green-400'
+                        }`}
+                        style={{ width: `${Math.min(100, (yaSync.keyInfo.totalCost / yaSync.keyInfo.totalCostLimit) * 100).toFixed(1)}%` }}
+                      />
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {((yaSync.keyInfo.totalCost / yaSync.keyInfo.totalCostLimit) * 100).toFixed(1)}% 已使用 · 剩余 {fmtUsd(yaSync.keyInfo.totalCostLimit - yaSync.keyInfo.totalCost)}
+                    </div>
+                  </div>
+
+                  {/* Token stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: '总请求', value: String(yaSync.total.requests) },
+                      { label: '输入 Tokens', value: fmtNum(yaSync.total.inputTokens) },
+                      { label: '输出 Tokens', value: fmtNum(yaSync.total.outputTokens) },
+                      { label: '缓存读取', value: fmtNum(yaSync.total.cacheReadTokens) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-gray-50 rounded-xl px-4 py-3">
+                        <div className="text-xs text-gray-400 mb-1">{label}</div>
+                        <div className="font-semibold tabular-nums">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Recent records */}
+                  {yaSync.recentRecords.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-medium text-gray-500 mb-2">最近调用记录</h3>
+                      <div className="border border-black/5 rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-black/5">
+                              <th className="text-left px-4 py-2 font-medium text-gray-400">时间</th>
+                              <th className="text-left px-4 py-2 font-medium text-gray-400">模型</th>
+                              <th className="text-right px-4 py-2 font-medium text-gray-400">输入</th>
+                              <th className="text-right px-4 py-2 font-medium text-gray-400">输出</th>
+                              <th className="text-right px-4 py-2 font-medium text-gray-400">费用</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {yaSync.recentRecords.slice(0, 20).map((r, i) => (
+                              <tr key={i} className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]">
+                                <td className="px-4 py-2 text-gray-400">{fmtTime(r.timestamp)}</td>
+                                <td className="px-4 py-2 font-mono text-gray-600 truncate max-w-[160px]">
+                                  {r.model.replace('claude-', '').replace(/-2025\d+/, '')}
+                                </td>
+                                <td className="px-4 py-2 text-right tabular-nums">{fmtNum(r.inputTokens)}</td>
+                                <td className="px-4 py-2 text-right tabular-nums">{fmtNum(r.outputTokens)}</td>
+                                <td className="px-4 py-2 text-right tabular-nums">{fmtUsd(r.cost)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* Keys table */}
             <section className="bg-white rounded-2xl border border-black/10 shadow-sm overflow-hidden">
