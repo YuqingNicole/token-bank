@@ -83,9 +83,10 @@ export async function fetchYASync(masterKey: string): Promise<YASyncData> {
 
 export async function getYASync(): Promise<YASyncData | null> {
   try {
-    const raw = await redis.get<string>(SYNC_KEY);
+    const raw = await redis.get(SYNC_KEY);
     if (!raw) return null;
-    return typeof raw === 'string' ? JSON.parse(raw) : raw as YASyncData;
+    if (typeof raw === 'string') return JSON.parse(raw) as YASyncData;
+    return raw as unknown as YASyncData;
   } catch {
     return null;
   }
