@@ -158,6 +158,9 @@ export default function VaultDashboard() {
             <a href="/query" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
               {t.dashboard.keyLookup}
             </a>
+            <a href="/monitoring" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
+              监控
+            </a>
           </div>
         </div>
       </div>

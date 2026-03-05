@@ -3,6 +3,7 @@ import { redis } from '@/lib/redis';
 import { isValidVendor } from '@/lib/vendors';
 import { buildUpstreamRequest } from '@/lib/proxy';
 import { extractTokenUsage, estimateVendorCostUsd, safeModelFromBody } from '@/lib/billing';
+import { logEvent } from '@/lib/events';
 
 type RouteContext = {
   params: Promise<{ vendor: string; path?: string[] }>;
@@ -99,7 +100,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
       costUsd?: number;
     };
 
+    const kMeta = { vendor: (keyData as { vendor: string }).vendor, group: (keyData as { group: string }).group, name: (keyData as { name: string }).name };
+
     if (kd.expiresAt && new Date(kd.expiresAt) < new Date()) {
+      void logEvent({ type: 'key.expired', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString() });
       return NextResponse.json({ error: 'Key expired' }, { status: 403 });
     }
 
@@ -107,6 +111,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (kd.totalQuota != null) {
       const usedTokens = (kd.inputTokens ?? 0) + (kd.outputTokens ?? 0);
       if (usedTokens >= kd.totalQuota) {
+        void logEvent({ type: 'quota.exceeded', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString() });
         return NextResponse.json({ error: 'Quota exceeded' }, { status: 429 });
       }
     }
@@ -149,6 +154,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         if (inputTokens === 0 && outputTokens === 0) return;
         const costInc = estimateVendorCostUsd(vendor, model, { inputTokens, outputTokens });
         console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} ✓ stream in=${inputTokens} out=${outputTokens} cost=$${costInc.toFixed(6)}`);
+        void logEvent({ type: 'proxy.success', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString(), model: model ?? undefined, inputTokens, outputTokens });
         const latest = parseKeyRecord(await redis.hget('vault:subkeys', subKey)) ?? keyData;
         const lk = latest as { inputTokens?: number; outputTokens?: number; costUsd?: number };
         void redis.hset('vault:subkeys', {
@@ -174,6 +180,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const outputInc = tokenUsage?.outputTokens ?? 0;
     const costInc = tokenUsage ? estimateVendorCostUsd(vendor, model, tokenUsage) : 0;
     console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} ✓ in=${inputInc} out=${outputInc} cost=$${costInc.toFixed(6)}`);
+    void logEvent({ type: 'proxy.success', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString(), model: model ?? undefined, inputTokens: inputInc, outputTokens: outputInc });
 
     const latest = parseKeyRecord(await redis.hget('vault:subkeys', subKey)) ?? keyData;
     const lk = latest as { inputTokens?: number; outputTokens?: number; costUsd?: number };

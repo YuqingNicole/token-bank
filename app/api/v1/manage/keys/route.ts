@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 import { isValidVendor } from '@/lib/vendors';
 import type { SubKeyData } from '@/lib/types';
+import { logEvent } from '@/lib/events';
 
 const parseKeyRecord = (value: string | Record<string, unknown> | null): SubKeyData | null => {
   if (!value) return null;
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
     };
 
     await redis.hset('vault:subkeys', { [subKey]: JSON.stringify(keyData) });
+    void logEvent({ type: 'key.created', subKey: subKey.slice(-8), vendor, group, name, timestamp: keyData.createdAt });
     return NextResponse.json({ subKey, ...keyData }, { status: 201 });
   } catch (error) {
     console.error('Failed to create sub-key', error);
@@ -109,12 +111,19 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'subKey is required' }, { status: 400 });
     }
 
+    const existing = await redis.hget<string>('vault:subkeys', subKey);
     const deleted = await redis.hdel('vault:subkeys', subKey);
 
     if (deleted === 0) {
       return NextResponse.json({ error: 'Key not found' }, { status: 404 });
     }
 
+    if (existing) {
+      try {
+        const kd = typeof existing === 'string' ? JSON.parse(existing) : existing;
+        void logEvent({ type: 'key.deleted', subKey: subKey.slice(-8), vendor: kd.vendor, group: kd.group, name: kd.name, timestamp: new Date().toISOString() });
+      } catch { /* ignore */ }
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Failed to delete sub-key', error);
