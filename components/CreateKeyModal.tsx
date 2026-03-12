@@ -57,7 +57,7 @@ export function CreateKeyModal({ onClose, onCreated }: CreateKeyModalProps) {
   const buildCurlSnippet = (subKey: string, v: VendorId) => {
     const baseUrl = (typeof window !== 'undefined' ? window.location.origin : '') + VENDOR_CONFIG[v].basePath;
 
-    if (v === 'openai') {
+    if (v === 'openai' || v === 'yunwu') {
       return `curl ${baseUrl} \\\n+  -H "Authorization: Bearer ${subKey}" \\\n+  -H "Content-Type: application/json" \\\n+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'`;
     }
 

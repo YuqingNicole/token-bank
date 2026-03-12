@@ -1,6 +1,6 @@
 # Claude Bridge Vault
 
-A multi-vendor API gateway + dashboard that issues **Sub-Keys** (e.g. `sk-vault-...`) to proxy requests to upstream AI vendors (Claude / YourAgent / OpenAI / Gemini).
+A multi-vendor API gateway + dashboard that issues **Sub-Keys** (e.g. `sk-vault-...`) to proxy requests to upstream AI vendors (Claude / YourAgent / OpenAI / Yunwu / Gemini).
 
 - Dashboard to create/manage keys, groups, quota & expiry
 - Proxy endpoints that accept Sub-Keys and forward to upstream vendor APIs
@@ -38,6 +38,7 @@ A multi-vendor API gateway + dashboard that issues **Sub-Keys** (e.g. `sk-vault-
 | YourAgent | `/api/v1/youragent` | `x-api-key: <subKey>` |
 | Claude | `/api/v1/claude` | `x-api-key: <subKey>` |
 | OpenAI | `/api/v1/openai` | `x-api-key: <subKey>` |
+| Yunwu | `/api/v1/yunwu` | `x-api-key: <subKey>` |
 | Gemini | `/api/v1/gemini` | `x-api-key: <subKey>` |
 
 > Note: For Gemini we proxy to Google Generative Language API.
@@ -46,7 +47,7 @@ A multi-vendor API gateway + dashboard that issues **Sub-Keys** (e.g. `sk-vault-
 
 `POST /api/v1/{vendor}` is a thin proxy that:
 
-- **Validates** `vendor` is one of: `claude`, `youragent`, `openai`, `gemini`.
+- **Validates** `vendor` is one of: `claude`, `youragent`, `openai`, `yunwu`, `gemini`.
 - **Authenticates** using header `x-api-key: <subKey>` (Sub-Key must exist in Redis hash `vault:subkeys` and must match the requested vendor).
 - **Checks quota/expiry**:
   - `expiresAt` (if set) must be in the future
@@ -80,6 +81,7 @@ UPSTASH_REDIS_REST_TOKEN=...
 YOURAGENT_MASTER_KEY=...
 CLAUDE_MASTER_KEY=...
 OPENAI_MASTER_KEY=...
+YUNWU_MASTER_KEY=...
 GEMINI_MASTER_KEY=...
 
 # Optional (used for ShareSnippet base URL in some server contexts)
@@ -128,6 +130,15 @@ curl http://localhost:3000/api/v1/claude \
 ```bash
 curl http://localhost:3000/api/v1/openai \
   -H "x-api-key: sk-vault-openai-xxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'
+```
+
+### Yunwu (Chat Completions)
+
+```bash
+curl http://localhost:3000/api/v1/yunwu \
+  -H "x-api-key: sk-vault-yunwu-xxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'
 ```
@@ -308,7 +319,7 @@ npm run dev
 
 `POST /api/v1/{vendor}`
 
-- **vendor**：`claude` / `youragent` / `openai` / `gemini`
+- **vendor**：`claude` / `youragent` / `openai` / `yunwu` / `gemini`
 - **鉴权**：统一使用 `x-api-key: <subKey>`（Sub-Key 存在于 Redis 的 `vault:subkeys`，并且 vendor 必须匹配）
 - **配额/过期**：
   - 设置了 `expiresAt` 时，过期返回 `403`

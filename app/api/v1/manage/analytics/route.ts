@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
-import { fetchYASync, getYASync } from '@/lib/youragent-sync';
+import { fetchYASync } from '@/lib/youragent-sync';
 import type { SubKeyData } from '@/lib/types';
 
 function parseSafe(v: unknown): SubKeyData | null {
@@ -23,7 +23,17 @@ function last30Days(): string[] {
 }
 
 export async function GET() {
-  const rawKeys = await redis.hgetall<Record<string, string>>('vault:subkeys');
+  const dates = last30Days();
+  const now = new Date();
+
+  // Parallel fetch — cuts 3 sequential ~6s Redis round-trips down to ~6s total
+  const [rawKeys, rawCounts, yaRaw] = await Promise.all([
+    redis.hgetall<Record<string, string>>('vault:subkeys'),
+    dates.length > 0
+      ? redis.mget<(string | null)[]>(...dates.map(d => `vault:daily:calls:${d}`) as [string, ...string[]])
+      : Promise.resolve([] as (string | null)[]),
+    redis.get('vault:youragent:sync').catch(() => null),
+  ]);
 
   const keys: (SubKeyData & { key: string })[] = rawKeys
     ? Object.entries(rawKeys)
@@ -31,7 +41,6 @@ export async function GET() {
         .filter(Boolean) as (SubKeyData & { key: string })[]
     : [];
 
-  const now = new Date();
   const byVendor: Record<string, { calls: number; inputTokens: number; outputTokens: number; costUsd: number; keyCount: number }> = {};
   let totalCalls = 0, totalInputTokens = 0, totalOutputTokens = 0, totalCostUsd = 0;
   let keysNearQuota = 0, expiringKeys = 0;
@@ -77,11 +86,8 @@ export async function GET() {
     costUsd: k.costUsd,
   }));
 
-  const dates = last30Days();
   const dailyCalls = dates.map(d => ({ date: d, calls: 0 }));
-
-  if (dates.length > 0) {
-    const rawCounts = await redis.mget<(string | null)[]>(...dates.map(d => `vault:daily:calls:${d}`) as [string, ...string[]]);
+  if (rawCounts) {
     rawCounts.forEach((v, i) => {
       if (v != null) dailyCalls[i].calls = parseInt(String(v), 10);
     });
@@ -89,10 +95,7 @@ export async function GET() {
 
   let yaSync = null;
   try {
-    const yaRaw = await redis.get('vault:youragent:sync');
-    if (yaRaw) {
-      yaSync = typeof yaRaw === 'string' ? JSON.parse(yaRaw) : yaRaw;
-    }
+    if (yaRaw) yaSync = typeof yaRaw === 'string' ? JSON.parse(yaRaw as string) : yaRaw;
   } catch { /* ignore */ }
 
   return NextResponse.json({

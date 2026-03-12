@@ -26,7 +26,7 @@ export function buildUpstreamRequest(
     };
   }
 
-  if (vendor === 'openai') {
+  if (vendor === 'openai' || vendor === 'yunwu') {
     return {
       url: config.endpoint,
       headers: {

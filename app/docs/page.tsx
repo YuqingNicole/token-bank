@@ -79,6 +79,11 @@ export default function DocsPage() {
                     <td className="px-4 py-2.5 text-black/60">Bearer token</td>
                   </tr>
                   <tr>
+                    <td className="px-4 py-2.5">Yunwu</td>
+                    <td className="px-4 py-2.5 text-black/60">/api/v1/yunwu</td>
+                    <td className="px-4 py-2.5 text-black/60">Bearer token</td>
+                  </tr>
+                  <tr>
                     <td className="px-4 py-2.5">Gemini</td>
                     <td className="px-4 py-2.5 text-black/60">/api/v1/gemini</td>
                     <td className="px-4 py-2.5 text-black/60">?key=</td>

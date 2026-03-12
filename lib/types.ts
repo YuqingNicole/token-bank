@@ -1,4 +1,4 @@
-export type VendorId = 'claude' | 'openai' | 'gemini' | 'youragent';
+export type VendorId = 'claude' | 'openai' | 'gemini' | 'youragent' | 'yunwu';
 export type AuthStyle = 'x-api-key' | 'bearer' | 'query-param';
 
 export interface VendorConfig {

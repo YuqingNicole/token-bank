@@ -8,7 +8,7 @@ import { VendorCard } from '@/components/VendorCard';
 import { CreateKeyModal } from '@/components/CreateKeyModal';
 import { useLang, LangToggle } from '@/components/LangContext';
 
-const VENDORS: VendorId[] = ['youragent', 'claude', 'openai', 'gemini'];
+const VENDORS: VendorId[] = ['youragent', 'claude', 'openai', 'yunwu', 'gemini'];
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

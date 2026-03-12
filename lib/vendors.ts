@@ -33,8 +33,16 @@ export const VENDOR_CONFIG: Record<VendorId, VendorConfig> = {
     keyPrefix: 'youragent',
     basePath: '/api/v1/youragent',
   },
+  yunwu: {
+    label: 'Yunwu',
+    endpoint: 'https://yunwu.ai/v1/chat/completions',
+    authStyle: 'bearer',
+    envKey: 'YUNWU_MASTER_KEY',
+    keyPrefix: 'yunwu',
+    basePath: '/api/v1/yunwu',
+  },
 };
 
 export function isValidVendor(v: unknown): v is VendorId {
-  return v === 'claude' || v === 'openai' || v === 'gemini' || v === 'youragent';
+  return v === 'claude' || v === 'openai' || v === 'gemini' || v === 'youragent' || v === 'yunwu';
 }
