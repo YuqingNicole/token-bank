@@ -4,10 +4,21 @@ import { isValidVendor } from '@/lib/vendors';
 import { buildUpstreamRequest } from '@/lib/proxy';
 import { extractTokenUsage, estimateVendorCostUsd, safeModelFromBody } from '@/lib/billing';
 import { logEvent } from '@/lib/events';
+import { proxyRateLimit } from '@/lib/ratelimit';
+import { notify } from '@/lib/webhook';
 
 type RouteContext = {
   params: Promise<{ vendor: string; path?: string[] }>;
 };
+
+// Simple round-robin counter per vendor for master key rotation
+const keyIndex: Record<string, number> = {};
+function pickMasterKey(vendor: string, keys: string[]): string {
+  if (keys.length === 1) return keys[0];
+  const idx = (keyIndex[vendor] ?? 0) % keys.length;
+  keyIndex[vendor] = idx + 1;
+  return keys[idx];
+}
 
 const parseKeyRecord = (value: unknown) => {
   if (!value) return null;
@@ -30,8 +41,11 @@ function isStreaming(rawBody: string): boolean {
   }
 }
 
-// Parse Anthropic SSE stream to extract token usage
-async function extractTokensFromSSE(stream: ReadableStream): Promise<{ inputTokens: number; outputTokens: number }> {
+// Parse SSE stream to extract token usage (supports Anthropic and OpenAI-compatible formats)
+async function extractTokensFromSSE(
+  stream: ReadableStream,
+  vendor: string,
+): Promise<{ inputTokens: number; outputTokens: number }> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let inputTokens = 0;
@@ -47,12 +61,23 @@ async function extractTokensFromSSE(stream: ReadableStream): Promise<{ inputToke
         if (jsonStr === '[DONE]') continue;
         try {
           const evt = JSON.parse(jsonStr) as Record<string, unknown>;
-          if (evt.type === 'message_start') {
-            const usage = (evt.message as Record<string, unknown>)?.usage as Record<string, number> | undefined;
-            if (usage) { inputTokens = usage.input_tokens ?? 0; outputTokens = usage.output_tokens ?? 0; }
-          } else if (evt.type === 'message_delta') {
+
+          if (vendor === 'claude' || vendor === 'youragent') {
+            // Anthropic SSE: message_start has input, message_delta has output
+            if (evt.type === 'message_start') {
+              const usage = (evt.message as Record<string, unknown>)?.usage as Record<string, number> | undefined;
+              if (usage) { inputTokens = usage.input_tokens ?? 0; outputTokens = usage.output_tokens ?? 0; }
+            } else if (evt.type === 'message_delta') {
+              const usage = evt.usage as Record<string, number> | undefined;
+              if (usage?.output_tokens) outputTokens = usage.output_tokens;
+            }
+          } else if (vendor === 'yunwu') {
+            // OpenAI-compatible SSE: final chunk contains usage with prompt_tokens + completion_tokens
             const usage = evt.usage as Record<string, number> | undefined;
-            if (usage?.output_tokens) outputTokens = usage.output_tokens;
+            if (usage) {
+              if (typeof usage.prompt_tokens === 'number') inputTokens = usage.prompt_tokens;
+              if (typeof usage.completion_tokens === 'number') outputTokens = usage.completion_tokens;
+            }
           }
         } catch { /* ignore malformed lines */ }
       }
@@ -103,36 +128,84 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const kMeta = { vendor: (keyData as { vendor: string }).vendor, group: (keyData as { group: string }).group, name: (keyData as { name: string }).name };
 
     if (kd.expiresAt && new Date(kd.expiresAt) < new Date()) {
-      void logEvent({ type: 'key.expired', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString() });
+      const ts = new Date().toISOString();
+      void logEvent({ type: 'key.expired', subKey: subKey.slice(-8), ...kMeta, timestamp: ts });
+      notify({ event: 'key.expired', subKey: subKey.slice(-8), ...kMeta, detail: `expired at ${kd.expiresAt}`, timestamp: ts });
       return NextResponse.json({ error: 'Key expired' }, { status: 403 });
+    }
+
+    // Rate limit check: sliding window per sub-key
+    const rl = await proxyRateLimit.limit(subKey);
+    if (!rl.success) {
+      const retryAfter = Math.ceil((rl.reset - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', retryAfter },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
     }
 
     // Quota check: token-based (totalQuota = max token budget)
     if (kd.totalQuota != null) {
       const usedTokens = (kd.inputTokens ?? 0) + (kd.outputTokens ?? 0);
       if (usedTokens >= kd.totalQuota) {
-        void logEvent({ type: 'quota.exceeded', subKey: subKey.slice(-8), ...kMeta, timestamp: new Date().toISOString() });
+        const ts = new Date().toISOString();
+        void logEvent({ type: 'quota.exceeded', subKey: subKey.slice(-8), ...kMeta, timestamp: ts });
+        notify({ event: 'quota.exceeded', subKey: subKey.slice(-8), ...kMeta, detail: `${usedTokens}/${kd.totalQuota} tokens`, timestamp: ts });
         return NextResponse.json({ error: 'Quota exceeded' }, { status: 429 });
       }
     }
 
-    const rawBody = await req.text();
+    let rawBody = await req.text();
     const model = safeModelFromBody(rawBody);
     const streaming = isStreaming(rawBody);
 
-    const upstream = buildUpstreamRequest(vendor, masterKeys[0], rawBody);
-    console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} model=${model ?? '?'} stream=${streaming} → ${upstream.url}`);
+    // Inject stream_options for OpenAI-compatible vendors so usage is included in final SSE chunk
+    if (streaming && vendor === 'yunwu') {
+      try {
+        const parsed = JSON.parse(rawBody);
+        if (!parsed.stream_options?.include_usage) {
+          parsed.stream_options = { ...parsed.stream_options, include_usage: true };
+          rawBody = JSON.stringify(parsed);
+        }
+      } catch { /* keep original body */ }
+    }
 
-    const response = await fetch(upstream.url, {
-      method: 'POST',
-      headers: upstream.headers,
-      body: upstream.body,
-    });
+    // Try master keys with round-robin + fallback on 401/429/5xx
+    let response: Response | null = null;
+    let usedKeyIdx = 0;
+    const firstKey = pickMasterKey(vendor, masterKeys);
+    const orderedKeys = [firstKey, ...masterKeys.filter(k => k !== firstKey)];
 
-    if (!response.ok) {
-      console.warn(`[proxy] ${vendor} key=${subKey.slice(-8)} ✗ HTTP ${response.status}`);
-      const errData = await response.json().catch(() => ({ error: 'Upstream error' }));
-      return NextResponse.json(errData, { status: response.status });
+    for (let i = 0; i < orderedKeys.length; i++) {
+      const upstream = buildUpstreamRequest(vendor, orderedKeys[i], rawBody);
+      if (i === 0) console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} model=${model ?? '?'} stream=${streaming} → ${upstream.url}`);
+
+      const res = await fetch(upstream.url, {
+        method: 'POST',
+        headers: upstream.headers,
+        body: upstream.body,
+      });
+
+      if (res.ok) { response = res; usedKeyIdx = i; break; }
+
+      // Retry with next key on auth failure or rate limit from upstream
+      const retryable = res.status === 401 || res.status === 429 || res.status >= 500;
+      if (retryable && i < orderedKeys.length - 1) {
+        console.warn(`[proxy] ${vendor} master-key#${i} ✗ HTTP ${res.status}, trying next key`);
+        continue;
+      }
+
+      // Last key or non-retryable error — return upstream error
+      console.warn(`[proxy] ${vendor} key=${subKey.slice(-8)} ✗ HTTP ${res.status}`);
+      const errData = await res.json().catch(() => ({ error: 'Upstream error' }));
+      return NextResponse.json(errData, { status: res.status });
+    }
+
+    if (!response) {
+      return NextResponse.json({ error: 'All upstream keys failed' }, { status: 502 });
+    }
+    if (usedKeyIdx > 0) {
+      console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} ✓ succeeded with master-key#${usedKeyIdx}`);
     }
 
     // Increment call count + lastUsed (fire-and-forget)
@@ -150,7 +223,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     if (streaming && response.body) {
       const [clientStream, parseStream] = response.body.tee();
 
-      void extractTokensFromSSE(parseStream).then(async ({ inputTokens, outputTokens }) => {
+      void extractTokensFromSSE(parseStream, vendor).then(async ({ inputTokens, outputTokens }) => {
         if (inputTokens === 0 && outputTokens === 0) return;
         const costInc = estimateVendorCostUsd(vendor, model, { inputTokens, outputTokens });
         console.log(`[proxy] ${vendor} key=${subKey.slice(-8)} ✓ stream in=${inputTokens} out=${outputTokens} cost=$${costInc.toFixed(6)}`);

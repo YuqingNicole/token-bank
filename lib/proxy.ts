@@ -26,35 +26,13 @@ export function buildUpstreamRequest(
     };
   }
 
-  if (vendor === 'openai' || vendor === 'yunwu') {
-    return {
-      url: config.endpoint,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${masterKey}`,
-      },
-      body: rawBody,
-    };
-  }
-
-  // gemini: extract model from body, build URL with model, remove model from body
-  let parsedBody: Record<string, unknown>;
-  try {
-    parsedBody = JSON.parse(rawBody);
-  } catch {
-    parsedBody = {};
-  }
-  const model = typeof parsedBody.model === 'string' ? parsedBody.model : 'gemini-pro';
-  const { model: _model, ...bodyWithoutModel } = parsedBody;
-  void _model;
-
-  const url = config.endpoint.replace('{model}', model) + `?key=${masterKey}`;
-
+  // yunwu (OpenAI-compatible)
   return {
-    url,
+    url: config.endpoint,
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${masterKey}`,
     },
-    body: JSON.stringify(bodyWithoutModel),
+    body: rawBody,
   };
 }

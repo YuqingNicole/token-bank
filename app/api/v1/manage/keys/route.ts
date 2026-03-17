@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 import { isValidVendor } from '@/lib/vendors';
-import type { SubKeyData } from '@/lib/types';
+import type { SubKeyData, KeyScope } from '@/lib/types';
 import { logEvent } from '@/lib/events';
 
 const parseKeyRecord = (value: string | Record<string, unknown> | null): SubKeyData | null => {
@@ -21,40 +21,67 @@ export async function GET(req: NextRequest) {
   try {
     const vendorFilter = req.nextUrl.searchParams.get('vendor');
     const groupFilter = req.nextUrl.searchParams.get('group');
+    const scopeFilter = req.nextUrl.searchParams.get('scope'); // 'internal' | 'external'
+    const limitParam = req.nextUrl.searchParams.get('limit');
+    const cursorParam = req.nextUrl.searchParams.get('cursor');
+
     const allKeys = await redis.hgetall<Record<string, string>>('vault:subkeys');
 
     if (!allKeys) {
-      return NextResponse.json({}, {
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-        },
+      return NextResponse.json(limitParam ? { keys: {}, nextCursor: null, total: 0 } : {}, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' },
       });
     }
 
-    const filtered: Record<string, unknown> = {};
+    // Filter
+    const entries: [string, SubKeyData][] = [];
     for (const [key, rawValue] of Object.entries(allKeys)) {
       const parsed = parseKeyRecord(rawValue);
       if (!parsed) continue;
       if (vendorFilter && parsed.vendor !== vendorFilter) continue;
       if (groupFilter && parsed.group !== groupFilter) continue;
-      filtered[key] = parsed;
+      if (scopeFilter) {
+        const keyScope = parsed.scope ?? 'internal';
+        if (keyScope !== scopeFilter) continue;
+      }
+      entries.push([key, parsed]);
     }
 
-    return NextResponse.json(filtered, {
-      headers: {
-        'Cache-Control': 'no-store, max-age=0',
-      },
+    // Sort by createdAt desc for stable cursor ordering
+    entries.sort((a, b) => (b[1].createdAt ?? '').localeCompare(a[1].createdAt ?? ''));
+
+    // If no limit param, return all (backward compatible)
+    if (!limitParam) {
+      const filtered: Record<string, SubKeyData> = {};
+      for (const [key, data] of entries) filtered[key] = data;
+      return NextResponse.json(filtered, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' },
+      });
+    }
+
+    // Paginated response
+    const limit = Math.min(Math.max(parseInt(limitParam, 10) || 50, 1), 200);
+    let startIdx = 0;
+    if (cursorParam) {
+      const idx = entries.findIndex(([key]) => key === cursorParam);
+      if (idx >= 0) startIdx = idx + 1;
+    }
+
+    const page = entries.slice(startIdx, startIdx + limit);
+    const keys: Record<string, SubKeyData> = {};
+    for (const [key, data] of page) keys[key] = data;
+    const nextCursor = page.length === limit && startIdx + limit < entries.length
+      ? page[page.length - 1][0]
+      : null;
+
+    return NextResponse.json({ keys, nextCursor, total: entries.length }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
   } catch (error) {
     console.error('Failed to load keys from Redis', error);
     return NextResponse.json(
       { error: 'Vault datastore unavailable' },
-      {
-        status: 500,
-        headers: {
-          'Cache-Control': 'no-store, max-age=0',
-        },
-      },
+      { status: 500, headers: { 'Cache-Control': 'no-store, max-age=0' } },
     );
   }
 }
@@ -65,6 +92,7 @@ export async function POST(req: NextRequest) {
     const name = typeof payload?.name === 'string' ? payload.name.trim() : '';
     const vendor = typeof payload?.vendor === 'string' ? payload.vendor.trim() : '';
     const group = typeof payload?.group === 'string' ? payload.group.trim() : '';
+    const scope: KeyScope = payload?.scope === 'external' ? 'external' : 'internal';
     const totalQuota = typeof payload?.totalQuota === 'number' ? Math.floor(payload.totalQuota) : null;
     const expiresAt = typeof payload?.expiresAt === 'string' && payload.expiresAt ? payload.expiresAt : null;
 
@@ -87,6 +115,7 @@ export async function POST(req: NextRequest) {
       name,
       vendor,
       group,
+      scope,
       usage: 0,
       createdAt: new Date().toISOString(),
       lastUsed: null,

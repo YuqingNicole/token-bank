@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Shield, Plus, LogOut, Zap, BarChart2, TrendingUp, Key, ExternalLink } from 'lucide-react';
+import { Shield, Plus, LogOut, Zap, BarChart2, TrendingUp, Key, ExternalLink, Activity, FileText, Settings, Search, Lock, Globe } from 'lucide-react';
 import { VENDOR_CONFIG } from '@/lib/vendors';
-import type { VendorId } from '@/lib/types';
+import type { VendorId, KeyScope } from '@/lib/types';
 import { VendorCard } from '@/components/VendorCard';
 import { CreateKeyModal } from '@/components/CreateKeyModal';
 import { useLang, LangToggle } from '@/components/LangContext';
 
-const VENDORS: VendorId[] = ['youragent', 'claude', 'openai', 'yunwu', 'gemini'];
+const VENDORS: VendorId[] = ['youragent', 'claude', 'yunwu'];
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -32,6 +32,7 @@ interface AnalyticsSummary {
 
 export default function VaultDashboard() {
   const { t } = useLang();
+  const [activeScope, setActiveScope] = useState<KeyScope>('internal');
   const [activeVendor, setActiveVendor] = useState<VendorId>('youragent');
   const [showCreate, setShowCreate] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -54,22 +55,22 @@ export default function VaultDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f7] text-[#111] font-sans selection:bg-black/10">
-      <div className="max-w-5xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] font-sans">
+      <div className="max-w-5xl mx-auto px-6 py-10">
         {/* Header */}
-        <header className="flex items-center justify-between mb-10 border-b border-black/10 pb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full border border-black/10 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-black" />
+        <header className="flex items-center justify-between mb-8 pb-6 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-[var(--radius-md)] bg-[var(--text)] flex items-center justify-center">
+              <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-                CLAUDE BRIDGE VAULT{' '}
-                <span className="text-[11px] px-2 py-0.5 border border-black/20 rounded-full uppercase">
+              <h1 className="text-xl font-bold tracking-tight flex items-center gap-2.5">
+                Token Bank
+                <span className="text-[10px] font-mono font-medium px-2 py-0.5 bg-[var(--surface-raised)] border border-[var(--border)] rounded-md text-[var(--text-3)]">
                   v2
                 </span>
               </h1>
-              <p className="text-sm text-black/60">{t.dashboard.subtitle}</p>
+              <p className="text-[13px] text-[var(--text-2)] mt-0.5">{t.dashboard.subtitle}</p>
             </div>
           </div>
 
@@ -77,96 +78,127 @@ export default function VaultDashboard() {
             <LangToggle />
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-black text-white text-sm font-semibold rounded-lg hover:bg-black/80 transition-colors"
+              className="focus-ring flex items-center gap-2 px-4 py-2.5 bg-[var(--accent)] text-[var(--accent-fg)] text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 transition-opacity duration-[var(--duration-fast)]"
             >
-              <Plus size={15} />
+              <Plus size={15} strokeWidth={2.5} />
               {t.dashboard.newKey}
             </button>
             <button
               onClick={handleLogout}
               title="Sign out"
-              className="p-2 rounded-lg border border-black/10 text-black/40 hover:text-black hover:border-black/30 transition-colors"
+              className="focus-ring p-2.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[var(--text-3)] hover:text-[var(--text)] hover:border-[var(--border-hover)] hover:bg-[var(--surface)] transition-all duration-[var(--duration-normal)]"
             >
               <LogOut size={15} />
             </button>
           </div>
         </header>
 
-        {/* Mini Dashboard */}
-        <div className="bg-white border border-black/10 rounded-2xl shadow-sm shadow-black/5 mb-6 px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-black/40">{t.dashboard.analytics}</span>
-            <a href="/analytics" className="flex items-center gap-1 text-[10px] text-black/35 hover:text-black transition-colors">
+        {/* Analytics Summary */}
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-vault mb-6 px-5 py-4">
+          <div className="flex items-center justify-between mb-3.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-3)]">{t.dashboard.analytics}</span>
+            <a href="/analytics" className="focus-ring flex items-center gap-1 text-[10px] text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors">
               <ExternalLink size={10} />
               <span>{t.analytics.title}</span>
             </a>
           </div>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-4">
             {[
-              { icon: <Zap size={11} />, label: t.analytics.totalCalls, value: summary ? fmtNum(summary.totalCalls) : '—' },
-              { icon: <BarChart2 size={11} />, label: t.analytics.totalTokens, value: summary ? fmtNum(summary.totalTokens) : '—' },
-              { icon: <TrendingUp size={11} />, label: t.analytics.estCost, value: summary ? fmtUsd(summary.totalCostUsd) : '—' },
-              { icon: <Key size={11} />, label: t.analytics.activeKeys, value: summary ? String(summary.activeKeys) : '—' },
+              { icon: <Zap size={12} />, label: t.analytics.totalCalls, value: summary ? fmtNum(summary.totalCalls) : '—' },
+              { icon: <BarChart2 size={12} />, label: t.analytics.totalTokens, value: summary ? fmtNum(summary.totalTokens) : '—' },
+              { icon: <TrendingUp size={12} />, label: t.analytics.estCost, value: summary ? fmtUsd(summary.totalCostUsd) : '—' },
+              { icon: <Key size={12} />, label: t.analytics.activeKeys, value: summary ? String(summary.activeKeys) : '—' },
             ].map(({ icon, label, value }) => (
-              <div key={label} className="flex flex-col gap-1">
-                <div className="flex items-center gap-1 text-black/35">
+              <div key={label} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 text-[var(--text-3)]">
                   {icon}
-                  <span className="text-[9px] uppercase tracking-[0.15em]">{label}</span>
+                  <span className="text-[9px] font-medium uppercase tracking-[0.15em]">{label}</span>
                 </div>
-                <div className="text-lg font-semibold font-mono text-black">{value}</div>
+                <div className="text-[18px] font-semibold font-mono tabular-nums">{value}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Vendor Rail */}
-        <div className="flex gap-2 mb-8">
-          {VENDORS.map((v) => (
-            <button
-              key={v}
-              onClick={() => setActiveVendor(v)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border ${
-                activeVendor === v
-                  ? 'bg-black text-white border-black'
-                  : 'border-black/10 text-black/60 hover:text-black hover:border-black/20 bg-white'
-              }`}
-            >
-              <span className="font-mono text-xs">{VENDOR_CONFIG[v].label}</span>
-              <span className={`text-[10px] font-mono ${activeVendor === v ? 'text-white/50' : 'text-black/30'}`}>
-                {VENDOR_CONFIG[v].keyPrefix}
-              </span>
-            </button>
-          ))}
+        {/* Scope Toggle + Vendor Rail */}
+        <div className="flex items-center gap-4 mb-6">
+          {/* Scope */}
+          <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius-md)] p-0.5">
+            {(['internal', 'external'] as KeyScope[]).map((s) => {
+              const active = activeScope === s;
+              const isInternal = s === 'internal';
+              return (
+                <button
+                  key={s}
+                  onClick={() => setActiveScope(s)}
+                  className={`focus-ring flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium rounded-[7px] transition-all duration-[var(--duration-normal)] ease-out-expo ${
+                    active
+                      ? isInternal
+                        ? 'bg-[var(--scope-internal)] text-white shadow-sm'
+                        : 'bg-[var(--scope-external)] text-white shadow-sm'
+                      : 'text-[var(--text-3)] hover:text-[var(--text-2)] hover:bg-[var(--surface-hover)]'
+                  }`}
+                >
+                  {isInternal ? <Lock size={12} /> : <Globe size={12} />}
+                  {isInternal ? t.dashboard.scopeInternal : t.dashboard.scopeExternal}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-6 bg-[var(--border)]" />
+
+          {/* Vendor Rail */}
+          <div className="flex gap-1.5">
+            {VENDORS.map((v) => (
+              <button
+                key={v}
+                onClick={() => setActiveVendor(v)}
+                className={`focus-ring flex items-center gap-2 px-3.5 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all duration-[var(--duration-normal)] ease-out-expo border ${
+                  activeVendor === v
+                    ? 'bg-[var(--accent)] text-[var(--accent-fg)] border-transparent shadow-sm'
+                    : 'border-[var(--border)] text-[var(--text-2)] hover:text-[var(--text)] hover:border-[var(--border-hover)] bg-[var(--surface)]'
+                }`}
+              >
+                <span>{VENDOR_CONFIG[v].label}</span>
+                <span className={`text-[10px] font-mono ${activeVendor === v ? 'text-white/40' : 'text-[var(--text-4)]'}`}>
+                  {VENDOR_CONFIG[v].keyPrefix}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Active Vendor Card */}
-        <VendorCard key={`${activeVendor}-${refreshToken}`} vendor={activeVendor} />
+        <VendorCard key={`${activeVendor}-${activeScope}-${refreshToken}`} vendor={activeVendor} scope={activeScope} />
 
-        {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-black/5 flex items-center justify-between text-xs text-black/30">
-          <span>{t.dashboard.footerLabel}</span>
-          <div className="flex items-center gap-2">
-            <a href="/analytics" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
-              {t.dashboard.analytics}
-            </a>
-            <a href="/docs" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
-              {t.dashboard.docs}
-            </a>
-            <a href="/settings" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
-              {t.dashboard.settings}
-            </a>
-            <a href="/query" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
-              {t.dashboard.keyLookup}
-            </a>
-            <a href="/monitoring" className="px-3 py-1.5 border border-black/20 rounded-lg text-xs font-medium hover:bg-black hover:text-white hover:border-black transition-colors">
-              监控
-            </a>
+        {/* Navigation */}
+        <nav className="mt-8 pt-6 border-t border-[var(--border)]">
+          <div className="grid grid-cols-5 gap-2">
+            {[
+              { href: '/analytics', icon: <BarChart2 size={15} />, label: t.dashboard.analytics },
+              { href: '/monitoring', icon: <Activity size={15} />, label: t.dashboard.monitoring },
+              { href: '/docs', icon: <FileText size={15} />, label: t.dashboard.docs },
+              { href: '/settings', icon: <Settings size={15} />, label: t.dashboard.settings },
+              { href: '/query', icon: <Search size={15} />, label: t.dashboard.keyLookup },
+            ].map(({ href, icon, label }) => (
+              <a
+                key={href}
+                href={href}
+                className="focus-ring group flex flex-col items-center gap-2 py-3.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-3)] hover:text-[var(--text)] hover:border-[var(--border-hover)] hover:shadow-vault transition-all duration-[var(--duration-normal)] ease-out-expo"
+              >
+                <span className="group-hover:scale-110 transition-transform duration-[var(--duration-normal)] ease-out-expo">{icon}</span>
+                <span className="text-[11px] font-medium">{label.replace(' →', '')}</span>
+              </a>
+            ))}
           </div>
-        </div>
+          <p className="text-center text-[10px] text-[var(--text-4)] mt-5 font-mono">{t.dashboard.footerLabel}</p>
+        </nav>
       </div>
 
       {showCreate && (
-        <CreateKeyModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
+        <CreateKeyModal onClose={() => setShowCreate(false)} onCreated={handleCreated} defaultScope={activeScope} />
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, Pencil, Trash2, Check, X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { VENDOR_CONFIG } from '@/lib/vendors';
-import type { SubKeyData, VendorId } from '@/lib/types';
+import type { SubKeyData, VendorId, KeyScope } from '@/lib/types';
 import { useLang, LangToggle } from '@/components/LangContext';
 import { GroupManager } from '@/components/GroupManager';
 import { emitVaultSync, onVaultSync } from '@/lib/vaultSync';
@@ -73,6 +73,13 @@ function KeySettingsRow({
     <div className="border border-black/10 rounded-xl bg-white overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3 min-w-0">
+          <span className={`text-[10px] rounded-full px-2 py-px uppercase tracking-wider flex-shrink-0 ${
+            (row.scope ?? 'internal') === 'external'
+              ? 'bg-amber-50 text-amber-600 border border-amber-200'
+              : 'bg-blue-50 text-blue-600 border border-blue-200'
+          }`}>
+            {(row.scope ?? 'internal') === 'external' ? t.dashboard.scopeExternal : t.dashboard.scopeInternal}
+          </span>
           <span className="text-[10px] border border-black/15 rounded-full px-2 py-px uppercase tracking-wider text-black/50 flex-shrink-0">
             {VENDOR_CONFIG[row.vendor].label}
           </span>
@@ -195,6 +202,7 @@ export default function SettingsPage() {
   const { t } = useLang();
   const s = t.settings;
   const [view, setView] = useState<'keys' | 'groups'>('keys');
+  const [scopeFilter, setScopeFilter] = useState<KeyScope>('internal');
   const [vendorFilter, setVendorFilter] = useState<string>('all');
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [groups, setGroups] = useState<GroupOption[]>([]);
@@ -203,10 +211,9 @@ export default function SettingsPage() {
   const loadKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const url = vendorFilter === 'all'
-        ? '/api/v1/manage/keys'
-        : `/api/v1/manage/keys?vendor=${vendorFilter}`;
-      const res = await fetch(url);
+      const params = new URLSearchParams({ scope: scopeFilter });
+      if (vendorFilter !== 'all') params.set('vendor', vendorFilter);
+      const res = await fetch(`/api/v1/manage/keys?${params}`);
       const data = await res.json();
       const rows: KeyRow[] = Object.entries(data).map(([key, val]) => ({ key, ...(val as SubKeyData) }));
       rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -214,7 +221,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [vendorFilter]);
+  }, [vendorFilter, scopeFilter]);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -262,6 +269,8 @@ export default function SettingsPage() {
         {/* Header */}
         <header className="flex items-center justify-between mb-10 border-b border-black/10 pb-6">
           <div className="flex items-center gap-3">
+            <a href="/vault" className="text-[13px] text-black/40 hover:text-black transition-colors mr-1">&larr;</a>
+            <div className="w-px h-5 bg-black/10" />
             <div className="w-12 h-12 rounded-full border border-black/10 flex items-center justify-center">
               <Settings className="w-6 h-6 text-black" />
             </div>
@@ -273,11 +282,25 @@ export default function SettingsPage() {
               <p className="text-sm text-black/60">{s.subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <LangToggle />
-            <a href="/vault" className="text-xs text-black/40 hover:text-black transition-colors">{s.back}</a>
-          </div>
+          <LangToggle />
         </header>
+
+        {/* Scope toggle */}
+        <div className="flex items-center gap-1 mb-4 bg-white border border-black/10 rounded-xl p-1 w-fit">
+          {(['internal', 'external'] as KeyScope[]).map((sc) => (
+            <button
+              key={sc}
+              onClick={() => setScopeFilter(sc)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                scopeFilter === sc
+                  ? 'bg-black text-white'
+                  : 'text-black/50 hover:text-black hover:bg-black/5'
+              }`}
+            >
+              {sc === 'internal' ? t.dashboard.scopeInternal : t.dashboard.scopeExternal}
+            </button>
+          ))}
+        </div>
 
         {/* Vendor filter */}
         <div className="flex gap-2 mb-4 flex-wrap">
@@ -297,7 +320,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Keys / Groups tab toggle */}
-        <div className="flex gap-1 mb-6 border-b border-black/8">
+        <div className="flex items-center gap-1 mb-6 border-b border-black/8">
           <button
             onClick={() => setView('keys')}
             className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
@@ -311,7 +334,6 @@ export default function SettingsPage() {
           <button
             onClick={() => setView('groups')}
             disabled={vendorFilter === 'all'}
-            title={vendorFilter === 'all' ? s.selectVendorForGroups : undefined}
             className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px disabled:opacity-30 disabled:cursor-not-allowed ${
               view === 'groups'
                 ? 'border-black text-black'
@@ -320,6 +342,9 @@ export default function SettingsPage() {
           >
             {s.viewGroups}
           </button>
+          {vendorFilter === 'all' && (
+            <span className="text-[10px] text-black/35 ml-2 italic">{s.selectVendorForGroups}</span>
+          )}
         </div>
 
         {/* Groups view */}

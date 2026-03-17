@@ -114,6 +114,8 @@ export default function UsageQuery() {
         {/* Header */}
         <header className="flex items-center justify-between mb-10 border-b border-black/10 pb-6">
           <div className="flex items-center gap-3">
+            <a href="/vault" className="text-[13px] text-black/40 hover:text-black transition-colors mr-1">&larr;</a>
+            <div className="w-px h-5 bg-black/10" />
             <div className="w-12 h-12 rounded-full border border-black/10 flex items-center justify-center">
               <KeyRound className="w-6 h-6 text-black" />
             </div>
@@ -127,12 +129,7 @@ export default function UsageQuery() {
               <p className="text-sm text-black/60">{q.subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <LangToggle />
-            <a href="/vault" className="text-xs text-black/40 hover:text-black transition-colors">
-              {q.back}
-            </a>
-          </div>
+          <LangToggle />
         </header>
 
         {/* Search Box */}

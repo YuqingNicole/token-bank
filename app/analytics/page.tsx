@@ -135,9 +135,10 @@ function StatusDot({ k }: { k: KeyHealth }) {
   const expired = k.daysUntilExpiry !== null && k.daysUntilExpiry <= 0;
   const nearQuota = k.quotaPct !== null && k.quotaPct >= 0.8;
   const stale = k.lastUsedHours !== null && k.lastUsedHours > 72;
-  if (expired || nearQuota) return <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400" />;
-  if (stale) return <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />;
-  return <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />;
+  if (expired) return <span title="Expired" className="inline-block w-1.5 h-1.5 rounded-full bg-red-400" />;
+  if (nearQuota) return <span title="Near quota limit (>80%)" className="inline-block w-1.5 h-1.5 rounded-full bg-red-400" />;
+  if (stale) return <span title="Inactive for 72+ hours" className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />;
+  return <span title="Healthy" className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />;
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -180,6 +181,10 @@ export default function AnalyticsPage() {
         {/* Header */}
         <header className="flex items-center justify-between mb-10 border-b border-black/10 pb-6">
           <div className="flex items-center gap-3">
+            <a href="/vault" className="text-[13px] text-black/40 hover:text-black transition-colors mr-1">
+              <ArrowLeft size={15} />
+            </a>
+            <div className="w-px h-5 bg-black/10" />
             <div className="w-12 h-12 rounded-full border border-black/10 flex items-center justify-center">
               <Activity className="w-5 h-5 text-black" />
             </div>
@@ -198,9 +203,6 @@ export default function AnalyticsPage() {
             >
               <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
             </button>
-            <a href="/vault" className="text-xs text-black/40 hover:text-black transition-colors flex items-center gap-1">
-              <ArrowLeft size={12} /> {a.back.replace('← ', '')}
-            </a>
           </div>
         </header>
 
@@ -270,8 +272,8 @@ export default function AnalyticsPage() {
             </div>
             {!loading && slicedDaily.length > 0 && (
               <div className="flex justify-between mt-1.5">
-                <span className="text-[9px] text-black/25 font-mono">{shortDate(slicedDaily[0].date)}</span>
-                <span className="text-[9px] text-black/25 font-mono">{shortDate(slicedDaily[slicedDaily.length - 1].date)}</span>
+                <span className="text-[9px] text-black/40 font-mono">{shortDate(slicedDaily[0].date)}</span>
+                <span className="text-[9px] text-black/40 font-mono">{shortDate(slicedDaily[slicedDaily.length - 1].date)}</span>
               </div>
             )}
           </div>
@@ -337,8 +339,8 @@ export default function AnalyticsPage() {
                       <div key={k.key} className={`bg-white border rounded-2xl p-4 shadow-sm shadow-black/5 ${expired ? 'border-red-200' : nearQ ? 'border-amber-200' : 'border-black/10'}`}>
                         <div className="flex items-start justify-between mb-2">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold truncate">{k.name || 'Unnamed'}</div>
-                            <div className="text-[10px] text-black/35 font-mono">{k.key.slice(-12)}</div>
+                            <div className="text-sm font-semibold truncate" title={k.name || 'Unnamed'}>{k.name || 'Unnamed'}</div>
+                            <div className="text-[10px] text-black/40 font-mono" title={k.key}>{k.key.slice(-12)}</div>
                           </div>
                           <span className="text-[9px] uppercase tracking-wider border border-black/15 rounded-full px-2 py-0.5 flex-shrink-0 ml-2">
                             {cfg?.label ?? k.vendor}
@@ -388,7 +390,7 @@ export default function AnalyticsPage() {
           }
         </div>
 
-        <div className="mt-10 pt-4 border-t border-black/5 text-xs text-black/25 text-center">
+        <div className="mt-10 pt-4 border-t border-black/5 text-xs text-black/40 text-center">
           {a.footer(new Date().toLocaleDateString())}
         </div>
       </div>

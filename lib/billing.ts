@@ -34,57 +34,80 @@ export function extractTokenUsage(vendor: VendorId, data: UsageLike): TokenUsage
     }
   }
 
-  // Gemini: usageMetadata: { promptTokenCount, candidatesTokenCount }
-  if (vendor === 'gemini') {
-    const usageMetadata = (data as { usageMetadata?: unknown }).usageMetadata;
-    if (usageMetadata && typeof usageMetadata === 'object') {
-      const um = usageMetadata as Record<string, unknown>;
-      const prompt = typeof um.promptTokenCount === 'number' ? um.promptTokenCount : 0;
-      const candidates = typeof um.candidatesTokenCount === 'number' ? um.candidatesTokenCount : 0;
-      if (prompt || candidates) return { inputTokens: prompt, outputTokens: candidates };
-    }
-  }
-
   return null;
 }
 
-// Price table is a best-effort estimate (USD per 1M tokens)
-// NOTE: keep this as a lightweight internal reference; update if you want exact vendor pricing.
-const CLAUDE_OFFICIAL_PRICES_PER_MILLION: Record<string, { input: number; output: number }> = {
-  // Anthropic examples
-  'claude-3-5-sonnet-latest': { input: 3.0, output: 15.0 },
-  'claude-3-5-haiku-latest': { input: 0.25, output: 1.25 },
-  'claude-3-opus-latest': { input: 15.0, output: 75.0 },
+// Price tables: best-effort estimates (USD per 1M tokens)
+// Grouped by vendor so each vendor resolves its own pricing before falling back.
 
-  // Defaults
-  __default__: { input: 3.0, output: 15.0 },
+const ANTHROPIC_PRICES: Record<string, { input: number; output: number }> = {
+  'claude-3-5-sonnet-latest':  { input: 3.0,   output: 15.0  },
+  'claude-3-5-sonnet-20241022':{ input: 3.0,   output: 15.0  },
+  'claude-sonnet-4-20250514':  { input: 3.0,   output: 15.0  },
+  'claude-3-5-haiku-latest':   { input: 0.80,  output: 4.0   },
+  'claude-3-5-haiku-20241022': { input: 0.80,  output: 4.0   },
+  'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.0   },
+  'claude-3-opus-latest':      { input: 15.0,  output: 75.0  },
+  'claude-3-opus-20240229':    { input: 15.0,  output: 75.0  },
+  'claude-opus-4-20250514':    { input: 15.0,  output: 75.0  },
+  __default__:                 { input: 3.0,   output: 15.0  },
+};
+
+// Yunwu proxies OpenAI-compatible models
+const OPENAI_COMPAT_PRICES: Record<string, { input: number; output: number }> = {
+  'gpt-4o':              { input: 2.50,  output: 10.0  },
+  'gpt-4o-2024-11-20':   { input: 2.50,  output: 10.0  },
+  'gpt-4o-mini':         { input: 0.15,  output: 0.60  },
+  'gpt-4o-mini-2024-07-18': { input: 0.15, output: 0.60 },
+  'gpt-4-turbo':         { input: 10.0,  output: 30.0  },
+  'gpt-4':               { input: 30.0,  output: 60.0  },
+  'gpt-3.5-turbo':       { input: 0.50,  output: 1.50  },
+  'o1':                  { input: 15.0,  output: 60.0  },
+  'o1-mini':             { input: 3.0,   output: 12.0  },
+  'o1-pro':              { input: 150.0, output: 600.0 },
+  'o3':                  { input: 10.0,  output: 40.0  },
+  'o3-mini':             { input: 1.10,  output: 4.40  },
+  'o4-mini':             { input: 1.10,  output: 4.40  },
+  __default__:           { input: 2.50,  output: 10.0  },
+};
+
+// Vendor → price table mapping
+const VENDOR_PRICE_TABLES: Record<string, Record<string, { input: number; output: number }>> = {
+  claude:    ANTHROPIC_PRICES,
+  youragent: ANTHROPIC_PRICES,
+  yunwu:     OPENAI_COMPAT_PRICES,
 };
 
 // YourAgent pricing rule: same token usage costs 4% of official Claude.
 const YOURAGENT_PRICE_MULTIPLIER = 0.04;
 
-export function estimateClaudeOfficialCostUsd(model: string | undefined, usage: TokenUsage): number {
-  const price = (model && CLAUDE_OFFICIAL_PRICES_PER_MILLION[model])
-    ? CLAUDE_OFFICIAL_PRICES_PER_MILLION[model]
-    : CLAUDE_OFFICIAL_PRICES_PER_MILLION.__default__;
-
-  const inputCost = (usage.inputTokens / 1_000_000) * price.input;
-  const outputCost = (usage.outputTokens / 1_000_000) * price.output;
-  return inputCost + outputCost;
+function lookupPrice(vendor: string, model: string | undefined): { input: number; output: number } {
+  const table = VENDOR_PRICE_TABLES[vendor] ?? ANTHROPIC_PRICES;
+  if (model) {
+    // Exact match first
+    if (table[model]) return table[model];
+    // Prefix match: "gpt-4o-2024-08-06" → try "gpt-4o"
+    for (const key of Object.keys(table)) {
+      if (key !== '__default__' && model.startsWith(key)) return table[key];
+    }
+  }
+  return table.__default__;
 }
 
 export function estimateVendorCostUsd(vendor: VendorId, model: string | undefined, usage: TokenUsage): number {
+  const price = lookupPrice(vendor, model);
+  const baseCost = (usage.inputTokens / 1_000_000) * price.input
+                 + (usage.outputTokens / 1_000_000) * price.output;
+
   if (vendor === 'youragent') {
-    return estimateClaudeOfficialCostUsd(model, usage) * YOURAGENT_PRICE_MULTIPLIER;
+    return baseCost * YOURAGENT_PRICE_MULTIPLIER;
   }
+  return baseCost;
+}
 
-  if (vendor === 'claude') {
-    return estimateClaudeOfficialCostUsd(model, usage);
-  }
-
-  // For other vendors, we currently don't have a strict official price table here.
-  // Fall back to Claude official pricing as a neutral estimate.
-  return estimateClaudeOfficialCostUsd(model, usage);
+// Keep backward compat for any callers
+export function estimateClaudeOfficialCostUsd(model: string | undefined, usage: TokenUsage): number {
+  return estimateVendorCostUsd('claude', model, usage);
 }
 
 export function safeModelFromBody(rawBody: string): string | undefined {

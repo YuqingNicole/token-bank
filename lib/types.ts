@@ -1,5 +1,6 @@
-export type VendorId = 'claude' | 'openai' | 'gemini' | 'youragent' | 'yunwu';
-export type AuthStyle = 'x-api-key' | 'bearer' | 'query-param';
+export type VendorId = 'claude' | 'youragent' | 'yunwu';
+export type AuthStyle = 'x-api-key' | 'bearer';
+export type KeyScope = 'internal' | 'external';
 
 export interface VendorConfig {
   label: string;
@@ -14,6 +15,7 @@ export interface SubKeyData {
   name: string;
   vendor: VendorId;
   group: string;
+  scope?: KeyScope;            // default 'internal' for backward compat
   usage: number;
   inputTokens?: number;
   outputTokens?: number;
