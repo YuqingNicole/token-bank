@@ -183,27 +183,40 @@ export function VendorCard({ vendor, scope = 'internal' }: VendorCardProps) {
           <div className="text-center py-8 text-sm text-[var(--text-3)]">{t.common.loading}</div>
         ) : (
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3.5 bg-[var(--surface-raised)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-3)]">{t.vendorCard.summaryUsage}</div>
-                <div className="text-[15px] font-semibold font-mono tabular-nums mt-1.5">{summary.calls.toLocaleString()}</div>
-              </div>
-              <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3.5 bg-[var(--surface-raised)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-3)]">{t.vendorCard.summaryTokens}</div>
-                <div className="text-[15px] font-semibold font-mono tabular-nums mt-1.5">{totalTokens ? totalTokens.toLocaleString() : '—'}</div>
-              </div>
-              <div className="border border-[var(--border)] rounded-[var(--radius-md)] p-3.5 bg-[var(--surface-raised)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-3)]">{t.vendorCard.summaryCost}</div>
-                <div className="text-[15px] font-semibold font-mono tabular-nums mt-1.5">
-                  {keys.some(k => k.costUsd != null) ? formatUsd(summary.costUsd) : '—'}
+            {/* Usage + Cost panel — all vendors */}
+            <div className="border border-black/10 rounded-xl overflow-hidden">
+              {/* Stats row */}
+              <div className={`grid ${vendor === 'youragent' ? 'grid-cols-4' : 'grid-cols-3'} divide-x divide-black/5`}>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-black/40 mb-1">{t.vendorCard.summaryUsage}</div>
+                  <div className="text-lg font-semibold font-mono tabular-nums">{summary.calls.toLocaleString()}</div>
                 </div>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-black/40 mb-1">{t.vendorCard.summaryTokens}</div>
+                  <div className="text-lg font-semibold font-mono tabular-nums">{totalTokens ? totalTokens.toLocaleString() : '—'}</div>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] uppercase tracking-widest text-black/40 mb-1">
+                    {vendor === 'youragent' ? t.vendorCard.budgetUsed : t.vendorCard.summaryCost}
+                  </div>
+                  <div className="text-lg font-bold font-mono tabular-nums">
+                    {keys.some(k => k.costUsd != null) ? formatUsd(summary.costUsd) : '—'}
+                  </div>
+                </div>
+                {vendor === 'youragent' && (
+                  <div className="px-4 py-3 text-center bg-green-50/50">
+                    <div className="text-[10px] uppercase tracking-widest text-green-600 mb-1">{t.vendorCard.savings}</div>
+                    <div className="text-lg font-bold font-mono tabular-nums text-green-600">{formatUsd(diffUsd)}</div>
+                  </div>
+                )}
               </div>
-            </div>
 
-            {vendor === 'youragent' && (
-              <div className="border border-black/10 rounded-xl overflow-hidden">
-                {/* Budget header */}
-                <div className="flex items-center justify-between px-4 py-2.5 bg-black/[0.03] border-b border-black/5">
+              {/* YourAgent: official comparison + budget */}
+              {vendor === 'youragent' && (
+                <div className="border-t border-black/5 px-4 py-2.5 flex items-center justify-between bg-black/[0.02]">
+                  <span className="text-[11px] text-black/40 font-mono">
+                    {t.vendorCard.claudeOfficial}: <span className="line-through">{formatUsd(claudeOfficialCostUsd)}</span>
+                  </span>
                   <span className="text-[11px] font-semibold text-black/60 flex items-center gap-1.5">
                     {t.vendorCard.budgetLabel}{' '}
                     {editingBudget ? (
@@ -222,34 +235,22 @@ export function VendorCard({ vendor, scope = 'internal' }: VendorCardProps) {
                       <>
                         ${budgetUsd % 1 === 0 ? budgetUsd.toFixed(0) : budgetUsd.toFixed(2)}
                         <button onClick={startEditBudget} className="text-black/30 hover:text-black/60"><Pencil size={10} /></button>
+                        <span className="text-black/30 font-normal ml-1">({t.vendorCard.budgetRemaining} {formatUsd(budgetRemainingUsd)})</span>
                       </>
                     )}
                   </span>
-                  <span className="text-[11px] text-black/40 font-mono">{t.vendorCard.budgetRemaining}: {formatUsd(budgetRemainingUsd)}</span>
                 </div>
+              )}
 
-                {/* Cost comparison grid */}
-                <div className="grid grid-cols-3 divide-x divide-black/5">
-                  <div className="px-4 py-3 text-center">
-                    <div className="text-[10px] uppercase tracking-widest text-black/40 mb-1">{t.vendorCard.budgetUsed}</div>
-                    <div className="text-lg font-bold font-mono tabular-nums">{formatUsd(summary.costUsd)}</div>
-                  </div>
-                  <div className="px-4 py-3 text-center">
-                    <div className="text-[10px] uppercase tracking-widest text-black/40 mb-1">{t.vendorCard.claudeOfficial}</div>
-                    <div className="text-lg font-mono tabular-nums text-black/40 line-through">{formatUsd(claudeOfficialCostUsd)}</div>
-                  </div>
-                  <div className="px-4 py-3 text-center bg-green-50/50">
-                    <div className="text-[10px] uppercase tracking-widest text-green-600 mb-1">{t.vendorCard.savings}</div>
-                    <div className="text-lg font-bold font-mono tabular-nums text-green-600">{formatUsd(diffUsd)}</div>
-                  </div>
-                </div>
-
-                {/* Explanation */}
-                <div className="px-4 py-2 bg-black/[0.02] border-t border-black/5">
-                  <p className="text-[10px] text-black/35 leading-relaxed">{t.vendorCard.costNote}</p>
-                </div>
+              {/* Pricing note — all vendors */}
+              <div className="px-4 py-2 bg-black/[0.015] border-t border-black/5">
+                <p className="text-[10px] text-black/35 leading-relaxed">
+                  {vendor === 'youragent' ? t.vendorCard.costNote
+                    : vendor === 'claude' ? t.vendorCard.costNoteClaude
+                    : t.vendorCard.costNoteYunwu}
+                </p>
               </div>
-            )}
+            </div>
 
             <KeyTable keys={keys} onDeleted={loadKeys} />
           </div>

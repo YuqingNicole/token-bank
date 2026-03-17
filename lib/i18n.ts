@@ -43,6 +43,9 @@ export const translations = {
       claudeOfficial: 'If Official',
       savings: 'Saved',
       costNote: 'Actual = YourAgent price (4% of official). If Official = what Anthropic would charge directly.',
+      costNoteClaude: 'Cost estimated at Anthropic official API pricing (USD).',
+      costNoteYunwu: 'Cost estimated at OpenAI official pricing. Yunwu reseller pricing may differ.',
+      officialPrice: 'Official Price',
     },
     keyTable: {
       name: 'Name',
@@ -371,6 +374,9 @@ export const translations = {
       claudeOfficial: '若走官方',
       savings: '节省',
       costNote: '实际费用 = YourAgent 价格（官方 4%）。若走官方 = 直接调 Anthropic API 的价格。',
+      costNoteClaude: '费用按 Anthropic 官方 API 定价估算（USD）。',
+      costNoteYunwu: '费用按 OpenAI 官方定价估算，Yunwu 代理商实际价格可能不同。',
+      officialPrice: '官方价',
     },
     keyTable: {
       name: '名称',
