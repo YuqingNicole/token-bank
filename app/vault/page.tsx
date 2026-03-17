@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Shield, Plus, LogOut, Zap, BarChart2, TrendingUp, Key, ExternalLink, Activity, FileText, Settings, Search, Lock, Globe } from 'lucide-react';
+import { Shield, Plus, LogOut, Zap, BarChart2, TrendingUp, Key, ExternalLink, Lock, Globe } from 'lucide-react';
 import { VENDOR_CONFIG } from '@/lib/vendors';
 import type { VendorId, KeyScope } from '@/lib/types';
 import { VendorCard } from '@/components/VendorCard';
@@ -180,28 +180,10 @@ export default function VaultDashboard() {
         {/* Active Vendor Card */}
         <VendorCard key={`${activeVendor}-${activeScope}-${refreshToken}`} vendor={activeVendor} scope={activeScope} />
 
-        {/* Navigation */}
-        <nav className="mt-8 pt-6 border-t border-[var(--border)]">
-          <div className="grid grid-cols-5 gap-2">
-            {[
-              { href: '/analytics', icon: <BarChart2 size={15} />, label: t.dashboard.analytics },
-              { href: '/monitoring', icon: <Activity size={15} />, label: t.dashboard.monitoring },
-              { href: '/docs', icon: <FileText size={15} />, label: t.dashboard.docs },
-              { href: '/settings', icon: <Settings size={15} />, label: t.dashboard.settings },
-              { href: '/query', icon: <Search size={15} />, label: t.dashboard.keyLookup },
-            ].map(({ href, icon, label }) => (
-              <a
-                key={href}
-                href={href}
-                className="focus-ring group flex flex-col items-center gap-2 py-3.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-3)] hover:text-[var(--text)] hover:border-[var(--border-hover)] hover:shadow-vault transition-all duration-[var(--duration-normal)] ease-out-expo"
-              >
-                <span className="group-hover:scale-110 transition-transform duration-[var(--duration-normal)] ease-out-expo">{icon}</span>
-                <span className="text-[11px] font-medium">{label.replace(' →', '')}</span>
-              </a>
-            ))}
-          </div>
-          <p className="text-center text-[10px] text-[var(--text-4)] mt-5 font-mono">{t.dashboard.footerLabel}</p>
-        </nav>
+        {/* Footer */}
+        <div className="mt-8 pt-4 border-t border-black/5">
+          <p className="text-center text-[10px] text-black/25 font-mono">{t.dashboard.footerLabel}</p>
+        </div>
       </div>
 
       {showCreate && (
