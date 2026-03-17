@@ -127,18 +127,17 @@ export default function DocsPage() {
   const tocItems: TocItem[] = [
     { id: 'overview', label: d.overview, num: '1' },
     { id: 'proxy-endpoints', label: d.proxyEndpoints, num: '2' },
-    { id: 'unified-endpoint', label: d.unifiedEndpoint, num: '3' },
-    { id: 'usage-examples', label: d.examples, num: '4' },
-    { id: 'key-management', label: d.keyManagement, num: '5' },
-    { id: 'group-management', label: d.groupManagement, num: '6' },
-    { id: 'analytics-settings', label: 'Analytics & Settings', num: '7' },
-    { id: 'rate-limiting', label: d.rateLimiting, num: '8' },
-    { id: 'quota-expiry', label: d.quotaExpiry, num: '9' },
-    { id: 'token-tracking', label: d.tokenTracking, num: '10' },
-    { id: 'master-key-rotation', label: d.masterKeyRotation, num: '11' },
-    { id: 'webhook', label: d.webhook, num: '12' },
-    { id: 'error-codes', label: d.errorCodes, num: '13' },
-    { id: 'key-format', label: d.keyFormat, num: '14' },
+    { id: 'usage-examples', label: d.examples, num: '3' },
+    { id: 'key-management', label: d.keyManagement, num: '4' },
+    { id: 'group-management', label: d.groupManagement, num: '5' },
+    { id: 'analytics-settings', label: 'Analytics & Settings', num: '6' },
+    { id: 'rate-limiting', label: d.rateLimiting, num: '7' },
+    { id: 'quota-expiry', label: d.quotaExpiry, num: '8' },
+    { id: 'token-tracking', label: d.tokenTracking, num: '9' },
+    { id: 'master-key-rotation', label: d.masterKeyRotation, num: '10' },
+    { id: 'webhook', label: d.webhook, num: '11' },
+    { id: 'error-codes', label: d.errorCodes, num: '12' },
+    { id: 'key-format', label: d.keyFormat, num: '13' },
   ];
 
   useEffect(() => {
@@ -210,29 +209,11 @@ export default function DocsPage() {
                   ['Claude', '/api/v1/claude', 'x-api-key', 'Anthropic Messages'],
                   ['YourAgent', '/api/v1/youragent', 'x-api-key', 'Anthropic Messages'],
                   ['Yunwu', '/api/v1/yunwu', 'x-api-key', 'OpenAI Chat Completions'],
-                  ['Unified', '/api/v1/unified', 'x-api-key', 'OpenAI → Anthropic (auto)'],
                 ]}
               />
             </Section>
 
-            {/* ── 3. Unified Endpoint ── */}
-            <Section id="unified-endpoint" title={d.unifiedEndpoint}>
-              <P>{d.unifiedDesc}</P>
-              <P>{d.unifiedModelMap}:</P>
-              <Table
-                headers={['OpenAI Model', 'Claude Model']}
-                rows={[
-                  ['gpt-4o', 'claude-sonnet-4-20250514'],
-                  ['gpt-4o-mini', 'claude-haiku-4-5-20251001'],
-                  ['gpt-4-turbo', 'claude-sonnet-4-20250514'],
-                  ['gpt-4', 'claude-opus-4-20250514'],
-                  ['gpt-3.5-turbo', 'claude-haiku-4-5-20251001'],
-                ]}
-              />
-              <P>If the model name is already a Claude model (e.g. <Code>claude-sonnet-4-20250514</Code>), it is passed through as-is.</P>
-            </Section>
-
-            {/* ── 4. Usage Examples ── */}
+            {/* ── 3. Usage Examples ── */}
             <Section id="usage-examples" title={d.examples}>
               <P>{d.exampleClaude}</P>
               <Block>{`curl https://your-domain.com/api/v1/claude \\
@@ -254,21 +235,6 @@ export default function DocsPage() {
     "messages": [{"role":"user","content":"Hello"}]
   }'`}</Block>
 
-              <P>{d.exampleUnified}</P>
-              <Block>{`curl https://your-domain.com/api/v1/unified \\
-  -H "x-api-key: sk-vault-claude-xxxxxxxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "gpt-4o",
-    "messages": [
-      {"role":"system","content":"You are helpful."},
-      {"role":"user","content":"Hello"}
-    ]
-  }'
-
-# Response is in OpenAI Chat Completions format:
-# { "id": "...", "object": "chat.completion", "choices": [...], "usage": {...} }`}</Block>
-
               <P>{d.exampleStream}</P>
               <Block>{`curl https://your-domain.com/api/v1/claude \\
   -H "x-api-key: sk-vault-claude-xxxxxxxx" \\
@@ -284,7 +250,7 @@ export default function DocsPage() {
 # and automatically added to the key's usage statistics.`}</Block>
             </Section>
 
-            {/* ── 5. Key Management API ── */}
+            {/* ── 4. Key Management API ── */}
             <Section id="key-management" title={d.keyManagement}>
               <P>{d.keyManagementDesc}</P>
               <EndpointList items={d.endpoints} />

@@ -103,7 +103,6 @@ export function DocsModal({ onClose }: DocsModalProps) {
                   <tr><td className="px-4 py-2.5">Claude</td><td className="px-4 py-2.5 text-black/60">/api/v1/claude</td><td className="px-4 py-2.5 text-black/60">Anthropic</td></tr>
                   <tr><td className="px-4 py-2.5">YourAgent</td><td className="px-4 py-2.5 text-black/60">/api/v1/youragent</td><td className="px-4 py-2.5 text-black/60">Anthropic</td></tr>
                   <tr><td className="px-4 py-2.5">Yunwu</td><td className="px-4 py-2.5 text-black/60">/api/v1/yunwu</td><td className="px-4 py-2.5 text-black/60">OpenAI</td></tr>
-                  <tr><td className="px-4 py-2.5">Unified</td><td className="px-4 py-2.5 text-black/60">/api/v1/unified</td><td className="px-4 py-2.5 text-black/60">OpenAI → Claude</td></tr>
                 </tbody>
               </table>
             </div>
@@ -118,12 +117,6 @@ export function DocsModal({ onClose }: DocsModalProps) {
   -H "anthropic-version: 2023-06-01" \\
   -d '{"model":"claude-sonnet-4-20250514","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'`}</Block>
 
-            <P>{d.exampleUnified}</P>
-            <Block>{`curl https://your-domain.com/api/v1/unified \\
-  -H "x-api-key: sk-vault-claude-xxxxxxxx" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"gpt-4o","messages":[{"role":"user","content":"Hello"}]}'
-# Auto-converts to Claude; response in OpenAI format`}</Block>
           </Section>
 
           <Section title={d.keyManagement}>
