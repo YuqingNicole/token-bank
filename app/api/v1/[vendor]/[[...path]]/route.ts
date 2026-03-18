@@ -105,10 +105,24 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   const subKey = req.headers.get('x-api-key');
-  const masterKeys = (process.env[`${vendor.toUpperCase()}_MASTER_KEY`] ?? '')
-    .split(',').map(k => k.trim()).filter(Boolean);
 
-  if (masterKeys.length === 0) {
+  // Resolve master keys — for yunwu, defer until we know the model so we can
+  // route gemini-* models to YUNWU_MASTER_KEY_GEMINI.
+  // For other vendors, resolve immediately.
+  function resolveMasterKeys(model?: string): string[] {
+    if (vendor === 'yunwu' && model?.startsWith('gemini')) {
+      const geminiKeys = (process.env.YUNWU_MASTER_KEY_GEMINI ?? '')
+        .split(',').map(k => k.trim()).filter(Boolean);
+      if (geminiKeys.length > 0) return geminiKeys;
+      // Fall back to default yunwu key if gemini-specific key not set
+    }
+    return (process.env[`${vendor.toUpperCase()}_MASTER_KEY`] ?? '')
+      .split(',').map(k => k.trim()).filter(Boolean);
+  }
+
+  // Early check: at least one key must exist for this vendor
+  const defaultKeys = resolveMasterKeys();
+  if (defaultKeys.length === 0) {
     console.error(`Missing ${vendor.toUpperCase()}_MASTER_KEY environment variable`);
     return NextResponse.json({ error: 'Service misconfigured' }, { status: 500 });
   }
@@ -197,6 +211,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     // Try master keys with round-robin + fallback on 401/429/5xx
+    const masterKeys = resolveMasterKeys(model);
     let response: Response | null = null;
     let usedKeyIdx = 0;
     const firstKey = pickMasterKey(vendor, masterKeys);
