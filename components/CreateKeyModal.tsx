@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Lock, Globe } from 'lucide-react';
+import { X, Plus, Lock, Globe, Loader2 } from 'lucide-react';
 import { VENDOR_CONFIG, VENDOR_MODELS, isValidVendor } from '@/lib/vendors';
 import type { VendorId, KeyScope } from '@/lib/types';
 import { ShareSnippet } from './ShareSnippet';
@@ -11,6 +11,12 @@ import { emitVaultSync } from '@/lib/vaultSync';
 interface GroupOption {
   key: string;
   label: string;
+}
+
+interface ModelOption {
+  label: string;
+  value: string;
+  group?: string;
 }
 
 interface CreateKeyModalProps {
@@ -28,6 +34,8 @@ export function CreateKeyModal({ onClose, onCreated, defaultScope = 'internal' }
   const [newGroupLabel, setNewGroupLabel] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [model, setModel] = useState('');
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [name, setName] = useState('');
   const [totalQuota, setTotalQuota] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
@@ -46,9 +54,32 @@ export function CreateKeyModal({ onClose, onCreated, defaultScope = 'internal' }
 
   useEffect(() => {
     loadGroups(vendor);
-    const models = VENDOR_MODELS[vendor];
-    setModel(models?.[0]?.value ?? '');
+    loadModels(vendor);
   }, [vendor]);
+
+  const loadModels = async (v: VendorId) => {
+    setModelsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/manage/models?vendor=${v}`);
+      if (res.ok) {
+        const data = await res.json();
+        const fetched: ModelOption[] = data.models ?? [];
+        setModels(fetched);
+        setModel(fetched[0]?.value ?? '');
+      } else {
+        // Fallback to hardcoded
+        const fallback = VENDOR_MODELS[v] ?? [];
+        setModels(fallback);
+        setModel(fallback[0]?.value ?? '');
+      }
+    } catch {
+      const fallback = VENDOR_MODELS[v] ?? [];
+      setModels(fallback);
+      setModel(fallback[0]?.value ?? '');
+    } finally {
+      setModelsLoading(false);
+    }
+  };
 
   const loadGroups = async (v: VendorId) => {
     try {
@@ -67,7 +98,7 @@ export function CreateKeyModal({ onClose, onCreated, defaultScope = 'internal' }
 
   const buildCurlSnippet = (subKey: string, v: VendorId) => {
     const baseUrl = (typeof window !== 'undefined' ? window.location.origin : '') + VENDOR_CONFIG[v].basePath;
-    const selectedModel = model || VENDOR_MODELS[v]?.[0]?.value || 'gpt-4o';
+    const selectedModel = model || models[0]?.value || 'gpt-4o';
 
     if (v === 'yunwu') {
       return `curl ${baseUrl} \\\n  -H "x-api-key: ${subKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"${selectedModel}","messages":[{"role":"user","content":"Hello"}]}'`;
@@ -149,9 +180,30 @@ export function CreateKeyModal({ onClose, onCreated, defaultScope = 'internal' }
     }
   };
 
+  // Render model <select> with optional optgroup
+  const renderModelOptions = () => {
+    const hasGroups = models.some((m) => m.group);
+    if (!hasGroups) {
+      return models.map((m) => (
+        <option key={m.value} value={m.value}>{m.label}</option>
+      ));
+    }
+    const groupNames: string[] = [];
+    for (const m of models) {
+      if (m.group && !groupNames.includes(m.group)) groupNames.push(m.group);
+    }
+    return groupNames.map((g) => (
+      <optgroup key={g} label={g}>
+        {models.filter((m) => m.group === g).map((m) => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </optgroup>
+    ));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/50">
-      <div className="bg-white text-black border border-black/10 rounded-2xl w-full max-w-md p-8 shadow-xl">
+      <div className="bg-white text-black border border-black/10 rounded-2xl w-full max-w-md p-8 shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-lg font-semibold">{t.createKeyModal.title}</h3>
           <button onClick={onClose} className="text-black/40 hover:text-black transition-colors">
@@ -242,38 +294,26 @@ export function CreateKeyModal({ onClose, onCreated, defaultScope = 'internal' }
             </div>
 
             {/* Model Select */}
-            {VENDOR_MODELS[vendor]?.length > 0 && (
+            {models.length > 0 && (
               <div>
                 <label className="text-[10px] font-semibold text-black/40 uppercase tracking-widest block mb-1.5">
                   {t.createKeyModal.model}{' '}
                   <span className="normal-case font-normal">({t.createKeyModal.optional})</span>
+                  {modelsLoading && <Loader2 size={10} className="inline ml-1 animate-spin" />}
                 </label>
                 <select
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                   className="w-full border border-black/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black/30"
+                  disabled={modelsLoading}
                 >
-                  {(() => {
-                    const models = VENDOR_MODELS[vendor];
-                    const hasGroups = models.some((m) => m.group);
-                    if (!hasGroups) {
-                      return models.map((m) => (
-                        <option key={m.value} value={m.value}>{m.label}</option>
-                      ));
-                    }
-                    const groups: string[] = [];
-                    for (const m of models) {
-                      if (m.group && !groups.includes(m.group)) groups.push(m.group);
-                    }
-                    return groups.map((g) => (
-                      <optgroup key={g} label={g}>
-                        {models.filter((m) => m.group === g).map((m) => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </optgroup>
-                    ));
-                  })()}
+                  {renderModelOptions()}
                 </select>
+                {models.length > 20 && (
+                  <p className="text-[10px] text-black/30 mt-1">
+                    {models.length} models available
+                  </p>
+                )}
               </div>
             )}
 
