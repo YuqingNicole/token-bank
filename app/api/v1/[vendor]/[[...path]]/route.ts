@@ -168,9 +168,15 @@ export async function POST(req: NextRequest, context: RouteContext) {
     let model = safeModelFromBody(rawBody);
     const streaming = isStreaming(rawBody);
 
-    // Auto-inject model from key config if request doesn't specify one
+    // Enforce key's bound model: if key has a model configured, always use it
     const keyModel = (keyData as { model?: string }).model;
-    if (!model && keyModel) {
+    if (keyModel) {
+      if (model && model !== keyModel) {
+        return NextResponse.json(
+          { error: `This key is bound to model "${keyModel}", cannot use "${model}"` },
+          { status: 403 },
+        );
+      }
       try {
         const parsed = JSON.parse(rawBody);
         parsed.model = keyModel;
