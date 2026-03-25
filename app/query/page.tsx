@@ -15,7 +15,7 @@ import {
   History,
   Trash2,
 } from 'lucide-react';
-import type { SubKeyRecord } from '@/lib/types';
+import type { SubKeyRecord, VendorId } from '@/lib/types';
 import { VENDOR_CONFIG } from '@/lib/vendors';
 import { ShareSnippet } from '@/components/ShareSnippet';
 import { useLang, LangToggle } from '@/components/LangContext';
